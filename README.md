@@ -12,7 +12,7 @@
 | **VM Autor**     | DarkSpirit                                                                  |
 | **Schwierigkeit**| Medium                                                                      |
 | **Berichtsdatum**| 29. April 2025                                                              |
-| **Bericht von**  | Ben Chehade                                                                 |
+| **Bericht von**  | Ben C.                                                                      |
 
 ## Einleitung
 
